@@ -1,0 +1,25 @@
+# Nvox configuration example.
+# Copy to ./nvox.toml or ~/.config/nvox/nvox.toml and edit as needed.
+# Every section is optional.
+
+[scan]
+# Maximum artifact-graph depth (chains such as LSB -> zlib -> base64 -> flag).
+max_depth = 4
+# Per-plugin wall-clock timeout in seconds.
+timeout = 120
+# Largest artifact Nvox will materialise (bytes).
+max_artifact_bytes = 67108864
+# Worker processes; 0 means one per CPU.
+jobs = 0
+
+[flags]
+# Flag formats. "{}" is the only placeholder and matches the flag body.
+formats = ["ctf{}"]
+
+[plugins]
+# Extra plugin directories, relative to this file or absolute.
+dirs = ["plugins", "~/.config/nvox/plugins"]
+
+[tools]
+# External tools that should never be invoked.
+disable = []

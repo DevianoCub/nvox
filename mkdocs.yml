@@ -1,0 +1,34 @@
+site_name: Nvox
+site_description: Modular forensic and steganography analysis framework
+site_url: https://example.invalid/nvox/
+repo_url: https://example.invalid/nvox/
+
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture: architecture.md
+  - CLI reference: cli.md
+  - Plugins: plugins.md
+  - Flag engine: flag-engine.md
+  - Forensics: forensics.md
+  - Development: development.md
+  - Roadmap: roadmap.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
