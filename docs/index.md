@@ -32,17 +32,18 @@ Nvox is under active development.
 | Milestone | Scope | Status |
 |---|---|---|
 | M0 | Bootstrap, configuration, `nvox doctor` | done |
-| M1 | Core engine: artifacts, registry, scheduler, hooks | next |
-| M2 | Flag engine: formats, decoders, XOR brute, provenance | planned |
+| M1 | Core engine: artifacts, registry, scheduler, hooks | done |
+| M2 | Flag engine: formats, decoders, XOR brute, provenance | next |
 | M3 | Deep image analysis and steganography | planned |
 | M4 | CLI polish, HTML report, TUI | planned |
 | M5 | External tool bridges, declarative plugins | planned |
 | M6 | Audio and generic file analysis | planned |
 | M7 | Hardening, docs, 0.1 release | planned |
 
-The only working command today is `nvox doctor`. Everything documented as
-"planned" describes the target design and is not implemented yet; each page
-marks its status explicitly.
+Working commands today: `nvox doctor`, `nvox plugins list|info|dirs` and
+`nvox extract`. The scanning command and its flag engine arrive with M2.
+Everything documented as "planned" describes the target design and is not
+implemented yet; each page marks its status explicitly.
 
 ## Documentation
 

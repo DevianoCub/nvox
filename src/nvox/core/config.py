@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,8 @@ class Config:
     plugin_dirs: tuple[Path, ...] = ()
     limits: ScanLimits = field(default_factory=ScanLimits)
     disabled_tools: tuple[str, ...] = ()
+    disabled_plugins: tuple[str, ...] = ()
+    plugin_options: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def default(cls, cwd: Path | None = None) -> Config:
@@ -126,6 +129,8 @@ class Config:
             else default_plugin_dirs(path.parent)
         )
         disabled = _string_list(tools.get("disable", []), "tools.disable", path)
+        disabled_plugins = _string_list(plugins.get("disable", []), "plugins.disable", path)
+        plugin_options = _plugin_options(plugins.get("options", {}), path)
 
         limits = ScanLimits(
             max_depth=_positive_int(
@@ -145,6 +150,8 @@ class Config:
             plugin_dirs=dirs,
             limits=limits,
             disabled_tools=tuple(disabled),
+            disabled_plugins=tuple(disabled_plugins),
+            plugin_options=plugin_options,
         )
 
 
@@ -184,3 +191,14 @@ def _positive_float(value: Any, key: str, path: Path) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
         raise ConfigError(f"{path}: {key} must be a positive number")
     return float(value)
+
+
+def _plugin_options(value: Any, path: Path) -> dict[str, dict[str, Any]]:
+    if not isinstance(value, dict):
+        raise ConfigError(f"{path}: plugins.options must be a table")
+    options: dict[str, dict[str, Any]] = {}
+    for name, table in value.items():
+        if not isinstance(name, str) or not isinstance(table, dict):
+            raise ConfigError(f"{path}: plugins.options.{name} must be a table")
+        options[name] = dict(table)
+    return options

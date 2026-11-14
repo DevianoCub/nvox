@@ -26,9 +26,16 @@ Nvox/
     cli.py                # Typer commands
     core/
       config.py           # nvox.toml discovery/validation
+      evidence.py         # read-only evidence snapshot + MIME sniffing
+      store.py            # content-addressed artifact store
+      registry.py         # plugin discovery and validation
+      engine.py           # queue, limits, dedup, hooks dispatch
+      hooks.py            # hook dispatch
+      command_plugin.py   # declarative TOML command plugins
       tools.py            # external tool registry + detection
       doctor.py           # environment diagnostics
-    plugins/              # built-in plugin packs (M1+)
+    plugins/              # built-in plugin packs (generic in M1, image/audio later)
+      generic/strings.py  # reference plugin
     tui/                  # Textual UI (M4)
   tests/
   docs/
@@ -70,7 +77,7 @@ formatter commands; do not hand-format around them.
 3. Give it a unique dotted `name`, a semver `version`, `api_version = 1`,
    `targets`, `priority` and `requires`.
 4. Emit artifacts through `Context`; never write to the evidence.
-5. Add a fixture and a test under `tests/plugins/`.
+5. Add a fixture and a test under `tests/`.
 6. Run the checks above.
 
 ## External tools

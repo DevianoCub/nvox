@@ -1,8 +1,8 @@
 # Forensics and evidence handling
 
-> **Status:** principles are fixed now; hash manifests, chain logs and the
-> output layout land with M1/M2. `docs/ru/` is reserved for the Russian
-> translation and is empty for now.
+> **Status:** evidence ingestion, hashing and the content-addressed artifact
+> store are implemented in M1. Run manifests and report files land with M2/M4.
+> `docs/ru/` is reserved for the Russian translation and is empty for now.
 
 Nvox is a triage and CTF tool, not a certified forensic suite. It is designed so
 that its output can be explained and reproduced, which is what matters both for
@@ -30,8 +30,8 @@ out/
   manifest.json        # evidence hashes, run metadata, tool versions
   findings.json        # ranked findings with provenance chains
   artifacts/
-    <sha256>           # stored artifacts (bitstreams, carved files, images)
-  index.jsonl          # append-only artifact/finding event log
+    <xx>/<sha256>      # stored artifacts (bitstreams, carved files, images)
+  index.jsonl          # append-only artifact event log
   report.html          # self-contained report (M4)
   run.log              # engine log with timings and skips
 ```
@@ -63,8 +63,8 @@ tied back to exactly one input.
 |---|---|
 | Zip bombs / decompression bombs | max artifact size, ratio check, depth limit |
 | Infinite plugin chains | content-hash visited set, `max_depth` |
-| Hanging external tools | per-plugin timeout, process-group kill |
-| Huge output floods | stdout/stderr caps in the sandbox |
+| Hanging external tools | per-plugin timeout (M1); process-group kill in M5 |
+| Huge output floods | artifact size cap (M1); streamed stdout/stderr caps in M5 |
 | Accidental modification | read-only opens, temp workdirs, no in-place writes |
 | Hostile parsers | subprocess isolation where practical; Python parsers kept small |
 

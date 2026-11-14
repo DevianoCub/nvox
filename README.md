@@ -12,9 +12,10 @@ nvox scan photo.png --flag-format 'ctf{}'
 
 ## Status
 
-Early development. The current milestone is **M0 (bootstrap)**: project
-scaffolding, configuration discovery, plugin API surface and `nvox doctor`.
-The scanning engine, flag engine and plugins land in M1-M3; see the
+Early development. **M0 (bootstrap)** and **M1 (core engine)** are complete:
+configuration discovery, `nvox doctor`, evidence ingestion, the artifact store,
+plugin discovery, the scheduler/hook engine, `nvox plugins` and `nvox extract`.
+The flag engine, image packs and scan command land in M2-M6; see the
 [roadmap](docs/roadmap.md).
 
 ## Why it is modular
@@ -62,18 +63,24 @@ uv sync --group dev --extra image
 ```bash
 nvox doctor                      # environment, config and external tools
 nvox doctor --json               # machine-readable diagnostics
+nvox plugins list                # loaded plugins and availability
+nvox plugins info generic.strings
+nvox plugins dirs                # discovery order and paths
+nvox extract <sha256> --store out/
 nvox --version
 ```
 
 Flag formats are user supplied: `{}` is the only placeholder and matches the
 flag body, so `ctf{}`, `htb{}` and `pico{}` all work without configuration.
+The `nvox scan` command that consumes them arrives with the M2 flag engine.
 
 ```bash
-nvox scan challenge.png --flag-format 'htb{}'
+nvox scan challenge.png --flag-format 'htb{}'   # planned, M2
 nvox scan ./dump --flag 'flag\{[^}]+\}' -i --depth 4
 ```
 
-See [docs/cli.md](docs/cli.md) for the full interface (scan lands in M1/M2).
+See [docs/cli.md](docs/cli.md) for the full interface and
+[docs/plugins.md](docs/plugins.md) for writing plugins.
 
 ## Documentation
 
@@ -85,9 +92,9 @@ intentionally empty for now.
 
 | Milestone | Scope |
 |---|---|
-| M0 | Bootstrap, config, `doctor` (current) |
-| M1 | Core engine: artifacts, registry, scheduler, hooks |
-| M2 | Flag engine: formats, decoders, XOR brute, provenance |
+| M0 | Bootstrap, config, `doctor` (done) |
+| M1 | Core engine: artifacts, registry, scheduler, hooks (done) |
+| M2 | Flag engine: formats, decoders, XOR brute, provenance (next) |
 | M3 | Deep image analysis and steganography |
 | M4 | CLI polish, HTML report, TUI |
 | M5 | External tool bridges, declarative plugins |

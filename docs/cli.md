@@ -1,7 +1,8 @@
 # CLI reference
 
-> **Status:** `doctor` and `--version` are implemented (M0). `scan`, `plugins`,
-> `extract` and `report` describe the M1-M4 interface and are not available yet.
+> **Status:** `doctor`, `plugins list|info|dirs`, `extract` and `--version` are
+> implemented. `scan` and `report` describe the M2/M4 interface and are not
+> available yet.
 
 ## Synopsis
 
@@ -82,22 +83,43 @@ nvox scan <path> --flag-format 'ctf{}' [options]
 
 Input may be a single file or a directory (recursive).
 
-## `nvox plugins` (planned, M1)
+## `nvox plugins`
 
 ```
-nvox plugins list            # name, version, kind, targets, availability
-nvox plugins info NAME       # manifest, options, requirements, docs
+nvox plugins list [--json]   # name, version, kind, targets, availability
+nvox plugins info NAME       # manifest, options, requirements, hooks
 nvox plugins dirs            # discovery paths and load order
 ```
 
-## `nvox extract` (planned, M1)
+`plugins list` shows a status per plugin:
+
+| Status | Meaning |
+|---|---|
+| `ok` | Ready to run |
+| `missing` | A binary listed in `requires` is not installed |
+| `disabled` | Disabled in `[plugins].disable` or `[tools].disable` |
+
+The `Origin` column is `builtin`, `directory`, `entry-point` or `declared`.
+`--json` emits the same data as a list of objects, suitable for CI; warnings go
+to stderr so stdout stays valid JSON.
+
+`plugins info NAME` prints the manifest, source path, requirement availability,
+effectively merged option values and any hooks the plugin implements.
+
+## `nvox extract`
 
 ```
-nvox extract <artifact-id> --out FILE
+nvox extract <artifact-id> [--store DIR] [--out FILE]
 ```
 
-Writes a single stored artifact (bitstream, carved file, decoded payload) to
-disk by id or prefix.
+Writes a stored artifact (bitstream, carved file, decoded payload) to disk by
+full SHA-256 or an unambiguous prefix. The store defaults to `out/` and uses the
+layout `out/artifacts/<first two hex characters>/<sha256>`.
+
+The payload is re-hashed before writing. A mismatch, an unknown id, an
+ambiguous prefix or an existing output file exits with code `1` instead of
+silently producing bad evidence. Without `--out`, the command prints the
+on-disk path and hash.
 
 ## `nvox report` (planned, M4)
 
@@ -111,7 +133,7 @@ Re-renders reports from a previous run's `findings.json` without rescanning.
 
 | Code | Meaning |
 |---|---|
-| `0` | Success, no flags found |
+| `0` | Success (for scans: no flags found) |
 | `1` | Error (bad config, unreadable input) |
 | `2` | Success, at least one flag found (scan only; useful in CI) |
 | `130` | Interrupted |
@@ -138,10 +160,19 @@ formats = ["ctf{}"]
 
 [plugins]
 dirs = ["plugins", "~/.config/nvox/plugins"]
+disable = []             # plugin names that must never run
+
+[plugins.options."generic.strings"]
+min_length = 6
+utf16 = false
 
 [tools]
 disable = ["steghide"]
 ```
+
+Plugin option defaults are declared by the plugin; values under
+`[plugins.options."<plugin-name>"]` override them. They are part of the dedup
+key, so changing an option re-runs the plugin on the same artifact.
 
 All keys are optional. Relative plugin directories are resolved against the
 directory containing `nvox.toml` (or the current directory when defaults are

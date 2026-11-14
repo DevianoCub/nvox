@@ -9,7 +9,7 @@ max_depth = 4
 timeout = 120
 # Largest artifact Nvox will materialise (bytes).
 max_artifact_bytes = 67108864
-# Worker processes; 0 means one per CPU.
+# Worker threads; 0 means one per CPU.
 jobs = 0
 
 [flags]
@@ -19,6 +19,13 @@ formats = ["ctf{}"]
 [plugins]
 # Extra plugin directories, relative to this file or absolute.
 dirs = ["plugins", "~/.config/nvox/plugins"]
+# Plugin names that must never run.
+disable = []
+
+# Per-plugin option overrides. Defaults are declared by the plugin.
+# [plugins.options."generic.strings"]
+# min_length = 6
+# utf16 = false
 
 [tools]
 # External tools that should never be invoked.

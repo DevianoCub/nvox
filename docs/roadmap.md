@@ -18,22 +18,25 @@ criteria are met.
 Acceptance: `uv run nvox doctor` works on a clean machine; config errors are
 clean messages, not tracebacks.
 
-## M1 — Core engine
+## M1 — Core engine (done)
 
-- [ ] Evidence ingestion: read-only open, SHA-256, size, MIME sniffing
-- [ ] Content-addressed artifact store with size caps and cleanup
-- [ ] Artifact kinds: `bytes`, `text`, `image`, `audio`, `archive`, `meta`
-- [ ] Plugin base classes in `nvox.api`; registration decorator
-- [ ] Registry: built-ins, local directories, `nvox.plugins` entry points,
+- [x] Evidence ingestion: read-only snapshot, SHA-256, size, MIME sniffing
+- [x] Content-addressed artifact store with size caps and disk mirroring
+- [x] Artifact kinds: `bytes`, `text`, `image`, `audio`, `archive`, `meta`
+- [x] Plugin base classes in `nvox.api`; registration decorator
+- [x] Registry: built-ins, local directories, `nvox.plugins` entry points,
       declarative TOML plugins
-- [ ] Scheduler: priorities, per-plugin timeout, depth/size budgets, workers
-- [ ] Dedup by (content hash, plugin, options) and visited set
-- [ ] Hooks: `pre_ingest`, `on_artifact`, `post_scan`, `on_finding`
-- [ ] `nvox plugins list|info|dirs`, `nvox extract`
-- [ ] Skip records with reasons; structured logging
+- [x] Scheduler: priorities, per-plugin timeout, depth/size budgets, workers
+- [x] Dedup by (content hash, plugin, options) and visited set
+- [x] Hooks: `pre_ingest`, `on_artifact`, `post_scan`, `on_finding`
+- [x] `nvox plugins list|info|dirs`, `nvox extract`
+- [x] Skip records with reasons; structured engine events (`logging` plus an
+      `on_event` sink)
 
-Acceptance: an end-to-end dummy chain (artifact -> child artifact) runs; tests
-cover dedup, depth, timeout and plugin requirement skips.
+Acceptance: the dummy chain `bytes -> text -> match` runs end to end;
+`tests/test_engine.py` covers dedup, depth, timeout, requirement/disabled skips,
+plugin errors and hooks; `tests/test_registry.py` covers discovery and TOML
+plugins; `tests/test_cli_plugins.py` covers inspection and extraction.
 
 ## M2 — Flag engine
 
@@ -78,10 +81,10 @@ report opens offline.
 
 ## M5 — Bridges and declarative plugins
 
-- [ ] `core/sandbox.py`: limits, process-group kill, output caps
+- [ ] `core/sandbox.py`: rlimits, process-group kill, streamed output caps
 - [ ] Bridges: exiftool, zsteg, steghide, stegseek, outguess, pngcheck,
       binwalk, foremost, StegSolve, zbar, tesseract
-- [ ] Declarative TOML command plugins (text/bytes/files/json outputs)
+- [ ] Harden declarative TOML command plugins (basic runner landed in M1)
 - [ ] `doctor` integration and graceful skips when tools are missing
 - [ ] `flake.nix` devshell with all optional tools
 

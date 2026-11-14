@@ -35,12 +35,12 @@ technique-specific glue.
 
 | Module | Responsibility | Status |
 |---|---|---|
-| `core/evidence.py` | Read-only ingestion, SHA-256, size, MIME detection | M1 |
-| `core/artifacts.py` | Content-addressed artifact store, dedup | M1 |
-| `core/registry.py` | Plugin discovery (Python, TOML, entry points) | M1 |
-| `core/scheduler.py` | Queue, priorities, timeouts, depth/size limits, workers | M1 |
-| `core/pipeline.py` | Graph orchestration, visited set, budgets | M1 |
-| `core/hooks.py` | `pre_ingest`, `on_artifact`, `post_scan`, `on_finding` | M1 |
+| `core/evidence.py` | Read-only snapshot, SHA-256, size, magic/extension MIME detection | M1 |
+| `core/store.py` | Content-addressed artifact store, disk mirror, `index.jsonl` | M1 |
+| `core/registry.py` | Plugin discovery and validation (built-ins, dirs, entry points, declared) | M1 |
+| `core/engine.py` | Queue, priorities, timeouts, depth/size budgets, dedup, workers | M1 |
+| `core/hooks.py` | `pre_ingest`, `on_artifact`, `post_scan`, `on_finding` dispatch | M1 |
+| `core/command_plugin.py` | Declarative TOML command plugins | M1 |
 | `core/flags.py` | Flag format compiler and surface scanning | M2 |
 | `core/decoders.py` | Base64/base32/hex/rot/xor/zlib/... transforms | M2 |
 | `core/findings.py` | Findings, context, provenance chain | M2 |
@@ -48,7 +48,7 @@ technique-specific glue.
 | `core/config.py` | `nvox.toml` discovery and validation | M0 |
 | `core/tools.py` | External tool registry and detection | M0 |
 | `core/doctor.py` | Environment diagnostics | M0 |
-| `core/sandbox.py` | Subprocess execution with limits | M5 |
+| `core/sandbox.py` | Hardened subprocess execution with rlimits and process-group kill | M5 |
 | `api.py` | Stable plugin API (`API_VERSION`) | M1 |
 | `cli.py` | Typer commands | M0+ |
 | `tui/` | Textual interface | M4 |
@@ -65,8 +65,15 @@ An artifact is an immutable, named blob plus metadata. Kinds:
 - `meta` — structured metadata (EXIF, chunks, tags).
 
 Each artifact is keyed by its SHA-256 so the same payload discovered by two
-plugins is analysed once. The store enforces `max_artifact_bytes`; anything
-larger is recorded as a skip with a reason instead of being materialised.
+plugins is stored once and analysed once. An artifact also carries its kind,
+media type, parent hashes, producing plugin, option parameters and derivation
+depth. Identical byte payloads therefore collapse to one node even if two
+plugins named them differently; plugins should emit derived content rather than
+a byte-identical reinterpretation of their input.
+
+The store enforces `max_artifact_bytes`; anything larger is recorded as a skip
+with a reason instead of being materialised. With `--store` (or a future
+`scan --out`), payloads and `index.jsonl` are mirrored to disk.
 
 ## Plugin types
 
@@ -82,20 +89,30 @@ no core changes. See [Plugins](plugins.md).
 ## Scheduling and limits
 
 - **Depth** (`scan.max_depth`, default 4): how many derivation steps away from
-  the evidence a technique may run. `PNG -> LSB -> zlib -> base64 -> flag` is
-  four steps.
-- **Timeout** (`scan.timeout`, default 120s): per plugin invocation, enforced
-  for Python plugins by the scheduler and for subprocess plugins by
-  `sandbox.py`.
-- **Size** (`scan.max_artifact_bytes`): upper bound for materialised artifacts.
-- **Workers** (`scan.jobs`, default auto): parallelism across artifacts.
-- **Dedup**: content hash plus plugin identity, so a plugin never runs twice on
-  the same input.
+  the evidence a technique may run. The evidence artifact is depth 0; a plugin
+  runs while its input depth is below the limit. `PNG -> LSB -> zlib -> base64
+  -> flag` is four steps.
+- **Timeout** (`scan.timeout`, default 120s): per plugin invocation. Python
+  plugins run in worker threads and check a cooperative deadline on emission;
+  a hung plugin is abandoned at its timeout and late emissions are ignored.
+  Command plugins additionally receive a subprocess timeout. Hard process
+  isolation lands in M5.
+- **Size** (`scan.max_artifact_bytes`): upper bound for materialised artifacts;
+  oversized emissions become skips.
+- **Workers** (`scan.jobs`, default auto): up to this many plugin invocations
+  run concurrently, in priority order. The artifact queue itself advances in a
+  deterministic breadth-first order.
+- **Dedup**: `(artifact hash, plugin name, options JSON)` for scheduling, and
+  payload SHA-256 for storage, so a plugin never runs twice on the same input
+  with the same options.
 - **Priority**: high-signal cheap checks (metadata, trailing data) run before
   expensive ones (DCT analysis, brute force).
+- **Run budget**: a scan stops scheduling new plugin invocations after 10,000
+  runs and records the reason.
 
 A plugin that fails, times out or misses its requirements does not abort the
-scan; the skip and its reason are recorded in the report.
+scan; the skip and its reason are recorded in the result. Skips are sorted by
+kind, plugin and artifact for stable reports.
 
 ## Hooks
 
@@ -103,10 +120,10 @@ Hooks are the supported way to change core behaviour without editing the core:
 
 | Hook | When | Use |
 |---|---|---|
-| `pre_ingest` | before evidence is hashed | reject/filter inputs, add context |
-| `on_artifact` | when an artifact is created | attach external analysis |
-| `post_scan` | after the queue drains | aggregate, re-rank, export |
-| `on_finding` | for each flag match | suppress false positives, notify |
+| `pre_ingest(path)` | before evidence is hashed | reject/filter inputs; return a reason string |
+| `on_artifact(artifact, ctx)` | when an artifact is stored | attach external analysis, emit extra artifacts |
+| `post_scan(result)` | after the queue drains | aggregate, re-rank, export |
+| `on_finding(finding)` | for each flag match (M2) | suppress false positives, notify |
 
 Plugins can also override services (flag scanner, reporter, artifact store)
 through configuration. This is deliberately a coarser extension point: it is
@@ -117,9 +134,9 @@ powerful, so the default implementations stay dependency-free.
 Python gives the fastest path to broad stego coverage: Pillow/numpy for pixels,
 rich ecosystem for parsing formats, and plugins that users can write in a few
 lines. The architecture keeps hot loops (bit-plane extraction, entropy maps,
-sliding-window scanning) behind small functions in `api.accel`, so a Rust
-module (PyO3) or a C extension can be swapped in later without touching plugin
-code.
+sliding-window scanning) behind small functions in a future `api.accel` module,
+so a Rust module (PyO3) or a C extension can be swapped in later without
+touching plugin code.
 
 The rule for native code is benchmark-driven: a native implementation is added
 only when a profiled workload (for example a 12-megapixel PNG) misses its

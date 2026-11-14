@@ -79,6 +79,10 @@ formats = ["ctf{}"]      # "{}" matches the flag body
 
 [plugins]
 dirs = ["plugins", "~/.config/nvox/plugins"]
+disable = []             # plugin names that must never run
+# Per-plugin option overrides; defaults are declared by the plugin.
+# [plugins.options."generic.strings"]
+# min_length = 6
 
 [tools]
 disable = []             # external tools that must never be invoked
@@ -105,6 +109,11 @@ Do not want a tool used even when installed? Add it to `[tools].disable`.
 
 ## What's next
 
-`scan` and its flag engine arrive in M1/M2. Until then the useful commands are
-`nvox doctor`, `nvox --help` and `nvox --version`. See the
+M1 is complete: the core engine can ingest evidence, load Python and TOML
+plugins, run an artifact graph and persist results, and you can inspect plugins
+with `nvox plugins list|info|dirs`. `nvox extract` reads artifacts from a store
+produced by the engine.
+
+`nvox scan` and its flag engine arrive in M2; until then the scanning entry
+point is the Python API (`nvox.core.engine.Engine`). See the
 [roadmap](roadmap.md) for the order of work.
