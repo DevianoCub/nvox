@@ -32,10 +32,15 @@ Nvox/
       engine.py           # queue, limits, dedup, hooks dispatch
       hooks.py            # hook dispatch
       command_plugin.py   # declarative TOML command plugins
+      surfaces.py         # ASCII/UTF-16 run extraction
+      flags.py            # flag formats, raw regex, surface scanner
+      findings.py         # findings, confidence, provenance chains
       tools.py            # external tool registry + detection
       doctor.py           # environment diagnostics
-    plugins/              # built-in plugin packs (generic in M1, image/audio later)
+    plugins/              # built-in plugin packs
       generic/strings.py  # reference plugin
+      decoders/           # base encodings, compression, XOR brute force
+      image/              # minimal EXIF and PNG LSB (deep analysis in M3)
     tui/                  # Textual UI (M4)
   tests/
   docs/

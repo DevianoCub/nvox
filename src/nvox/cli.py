@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json as jsonlib
+from dataclasses import replace
+from datetime import UTC, datetime
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
@@ -17,7 +19,16 @@ from nvox import __version__
 from nvox.api import Plugin
 from nvox.core import doctor as doctor_module
 from nvox.core.config import Config, ConfigError
-from nvox.core.registry import ENTRY_POINT_GROUP, PluginRegistry
+from nvox.core.engine import Engine, ScanResult, Skip
+from nvox.core.findings import Finding
+from nvox.core.flags import FlagFormatError, FlagScanner, build_flag_specs
+from nvox.core.registry import (
+    ENTRY_POINT_GROUP,
+    PluginLoadError,
+    PluginRegistry,
+    is_external,
+)
+from nvox.core.store import ArtifactStore, ArtifactStoreError
 
 console = Console()
 
@@ -231,6 +242,154 @@ def plugins_dirs(ctx: typer.Context) -> None:
 
 
 @app.command()
+def scan(
+    ctx: typer.Context,
+    path: Annotated[
+        Path,
+        typer.Argument(help="Evidence file or directory to scan recursively."),
+    ],
+    flag_formats: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--flag-format",
+            "-f",
+            help="Flag format with a single '{}' placeholder; repeatable.",
+        ),
+    ] = None,
+    patterns: Annotated[
+        list[str] | None,
+        typer.Option("--flag", help="Raw flag regular expression; repeatable."),
+    ] = None,
+    ignore_case: Annotated[
+        bool,
+        typer.Option("--ignore-case", "-i", help="Match formats and patterns case-insensitively."),
+    ] = False,
+    min_length: Annotated[
+        int,
+        typer.Option("--min-length", help="Minimum flag body length."),
+    ] = 4,
+    max_length: Annotated[
+        int,
+        typer.Option("--max-length", help="Maximum flag body length."),
+    ] = 200,
+    depth: Annotated[
+        int | None,
+        typer.Option("--depth", help="Override the maximum artifact depth."),
+    ] = None,
+    timeout: Annotated[
+        float | None,
+        typer.Option("--timeout", help="Override the per-plugin timeout in seconds."),
+    ] = None,
+    jobs: Annotated[
+        int | None,
+        typer.Option("--jobs", "-j", help="Override the worker count (0 = auto)."),
+    ] = None,
+    plugin_filter: Annotated[
+        str | None,
+        typer.Option(
+            "--plugins",
+            help="Comma/space separated plugin names to run (default: all loaded).",
+        ),
+    ] = None,
+    no_external: Annotated[
+        bool,
+        typer.Option("--no-external", help="Disable command plugins and external-tool bridges."),
+    ] = False,
+    no_xor_brute: Annotated[
+        bool,
+        typer.Option("--no-xor-brute", help="Disable the single-byte XOR brute-force decoder."),
+    ] = False,
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Directory for artifacts and findings.json."),
+    ] = Path("out"),
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the complete report as JSON on stdout."),
+    ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Show skips and per-plugin failures."),
+    ] = False,
+) -> None:
+    """Scan evidence for flags across raw, text, metadata and decoded surfaces."""
+    started_at = datetime.now(UTC)
+    config = _load_config(ctx)
+    config = _config_with_limits(
+        config,
+        depth=depth,
+        timeout=timeout,
+        jobs=jobs,
+    )
+    requested_formats = list(flag_formats or ()) or list(config.flag_formats)
+    requested_patterns = list(patterns or ())
+    try:
+        specs = build_flag_specs(
+            requested_formats,
+            requested_patterns,
+            ignore_case=ignore_case,
+            min_length=min_length,
+            max_length=max_length,
+        )
+    except FlagFormatError as exc:
+        _fail(str(exc))
+
+    registry = _load_registry(config, json_output=json_output)
+    registry = _filter_registry(
+        registry,
+        plugin_filter=plugin_filter,
+        no_external=no_external,
+        no_xor_brute=no_xor_brute,
+    )
+
+    out_dir = out.expanduser()
+    try:
+        store = ArtifactStore(root=out_dir, max_bytes=config.limits.max_artifact_bytes)
+    except ArtifactStoreError as exc:
+        _fail(str(exc))
+
+    files = _collect_inputs(path, out_dir)
+    engine = Engine(
+        config,
+        registry=registry,
+        store=store,
+        flag_scanner=FlagScanner(specs),
+        jobs=config.limits.effective_jobs(),
+    )
+
+    results: list[tuple[Path, ScanResult]] = []
+    for evidence_path in files:
+        results.append((evidence_path, engine.analyze(evidence_path)))
+
+    findings = _aggregate_findings(results)
+    report = _build_report(
+        results,
+        findings,
+        formats=requested_formats,
+        patterns=requested_patterns,
+        ignore_case=ignore_case,
+        min_length=min_length,
+        max_length=max_length,
+        started_at=started_at,
+    )
+    report_path = out_dir / "findings.json"
+    try:
+        report_path.write_text(
+            jsonlib.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        _fail(f"cannot write {report_path}: {exc}")
+
+    if json_output:
+        typer.echo(jsonlib.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        _render_scan(report, results, findings, report_path, verbose=verbose, target=path)
+    if findings:
+        raise typer.Exit(code=2)
+
+
+@app.command()
 def extract(
     artifact_id: Annotated[str, typer.Argument(help="Artifact SHA-256 or unique prefix.")],
     store: Annotated[
@@ -270,6 +429,206 @@ def extract(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_bytes(payload)
     console.print(f"wrote {escape(str(out))} [dim]({len(payload)} bytes, sha256 {digest})[/]")
+
+
+def _config_with_limits(
+    config: Config,
+    *,
+    depth: int | None,
+    timeout: float | None,
+    jobs: int | None,
+) -> Config:
+    limits = config.limits
+    if depth is not None:
+        if depth < 1:
+            _fail("--depth must be at least 1")
+        limits = replace(limits, max_depth=depth)
+    if timeout is not None:
+        if timeout <= 0:
+            _fail("--timeout must be greater than zero")
+        limits = replace(limits, timeout=timeout)
+    if jobs is not None:
+        if jobs < 0:
+            _fail("--jobs must be zero or greater")
+        limits = replace(limits, jobs=jobs)
+    return replace(config, limits=limits)
+
+
+def _filter_registry(
+    registry: PluginRegistry,
+    *,
+    plugin_filter: str | None,
+    no_external: bool,
+    no_xor_brute: bool,
+) -> PluginRegistry:
+    records = {record.name: record for record in registry.records}
+    if plugin_filter is not None:
+        requested = [part for part in plugin_filter.replace(",", " ").split() if part]
+        if not requested:
+            _fail("--plugins did not contain any plugin names")
+        unknown = [name for name in requested if name not in records]
+        if unknown:
+            _fail(f"unknown plugin(s): {', '.join(sorted(unknown))}")
+        allowed = set(requested)
+    else:
+        allowed = set(records)
+    if no_external:
+        allowed = {name for name in allowed if not is_external(records[name])}
+    if no_xor_brute:
+        allowed.discard("decoder.xor")
+    try:
+        return registry.subset(sorted(allowed))
+    except PluginLoadError as exc:
+        _fail(str(exc))
+
+
+def _collect_inputs(path: Path, out_dir: Path) -> list[Path]:
+    target = path.expanduser()
+    if not target.exists():
+        _fail(f"input does not exist: {target}")
+    if target.is_file():
+        return [target]
+    if not target.is_dir():
+        _fail(f"input is neither a file nor a directory: {target}")
+    out_resolved = out_dir.resolve()
+    files: list[Path] = []
+    for candidate in sorted(target.rglob("*")):
+        if not candidate.is_file():
+            continue
+        try:
+            candidate.resolve().relative_to(out_resolved)
+        except ValueError:
+            files.append(candidate)
+    if not files:
+        _fail(f"no files found in {target}")
+    return files
+
+
+def _aggregate_findings(
+    results: list[tuple[Path, ScanResult]],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    seen: set[tuple[str, str, str, int]] = set()
+    for _path, result in results:
+        for finding in result.findings:
+            key = (
+                finding.value,
+                finding.evidence_sha256,
+                finding.artifact,
+                finding.offset,
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append(finding)
+    return sorted(findings, key=lambda item: (item.value, item.evidence_path, item.offset))
+
+
+def _build_report(
+    results: list[tuple[Path, ScanResult]],
+    findings: list[Finding],
+    *,
+    formats: list[str],
+    patterns: list[str],
+    ignore_case: bool,
+    min_length: int,
+    max_length: int,
+    started_at: datetime,
+) -> dict[str, Any]:
+    finished_at = datetime.now(UTC)
+    evidence = []
+    for path, result in results:
+        entry = {"path": str(path), **result.to_dict()}
+        evidence.append(entry)
+    return {
+        "nvox": __version__,
+        "started_at": started_at.isoformat(),
+        "finished_at": finished_at.isoformat(),
+        "duration": round((finished_at - started_at).total_seconds(), 6),
+        "formats": formats,
+        "patterns": patterns,
+        "options": {
+            "ignore_case": ignore_case,
+            "min_length": min_length,
+            "max_length": max_length,
+        },
+        "evidence": evidence,
+        "findings": [finding.to_dict() for finding in findings],
+        "summary": {
+            "files": len(results),
+            "artifacts": sum(len(result.artifacts) for _path, result in results),
+            "findings": len(findings),
+            "skips": sum(len(result.skips) for _path, result in results),
+            "plugin_runs": sum(result.plugin_runs for _path, result in results),
+            "duration": round((finished_at - started_at).total_seconds(), 6),
+        },
+    }
+
+
+def _render_scan(
+    report: dict[str, Any],
+    results: list[tuple[Path, ScanResult]],
+    findings: list[Finding],
+    report_path: Path,
+    *,
+    verbose: bool,
+    target: Path,
+) -> None:
+    console.print(f"[bold]Nvox scan[/] {escape(str(target))}")
+    if findings:
+        table = Table(title="Findings", title_justify="left")
+        table.add_column("Flag", style="bold", overflow="fold")
+        table.add_column("Conf", no_wrap=True)
+        table.add_column("Surface", no_wrap=True)
+        table.add_column("Offset", justify="right", no_wrap=True)
+        table.add_column("Evidence", overflow="fold")
+        table.add_column("Chain", overflow="fold")
+        styles = {"high": "green", "medium": "yellow", "low": "dim"}
+        for finding in findings:
+            chain = " -> ".join(step.plugin for step in finding.chain) or "evidence"
+            table.add_row(
+                escape(finding.value),
+                f"[{styles.get(finding.confidence, 'white')}]{finding.confidence}[/]",
+                finding.surface,
+                f"0x{finding.offset:x}",
+                escape(finding.evidence_path),
+                escape(chain),
+            )
+        console.print(table)
+    else:
+        console.print("[green]No flags found.[/]")
+
+    if verbose:
+        skips = _all_skips(results)
+        if skips:
+            skip_table = Table(title=f"Skips ({len(skips)})", title_justify="left")
+            skip_table.add_column("Plugin", no_wrap=True)
+            skip_table.add_column("Kind", no_wrap=True)
+            skip_table.add_column("Artifact", no_wrap=True)
+            skip_table.add_column("Reason", overflow="fold")
+            for skip in skips:
+                skip_table.add_row(
+                    escape(skip.plugin or "-"),
+                    skip.kind,
+                    skip.artifact[:12] or "-",
+                    escape(skip.reason),
+                )
+            console.print(skip_table)
+
+    summary = report["summary"]
+    console.print(
+        f"[dim]{summary['files']} file(s), {summary['artifacts']} artifact(s), "
+        f"{summary['plugin_runs']} plugin run(s), {summary['skips']} skip(s), "
+        f"{summary['findings']} finding(s) in {summary['duration']:.2f}s[/]"
+    )
+    console.print(f"[dim]report: {escape(str(report_path))}[/]")
+
+
+def _all_skips(results: list[tuple[Path, ScanResult]]) -> list[Skip]:
+    return sorted(
+        (skip for _path, result in results for skip in result.skips),
+        key=lambda skip: (skip.kind, skip.plugin, skip.artifact),
+    )
 
 
 def _load_config(ctx: typer.Context) -> Config:

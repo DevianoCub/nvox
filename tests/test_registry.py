@@ -220,6 +220,37 @@ def test_requirements_report() -> None:
     assert requirements["nvox-tool-that-does-not-exist"] is False
 
 
+def test_registry_subset_and_without_external(tmp_path: Path) -> None:
+    plugin_dir = tmp_path / "plugins"
+    _write(plugin_dir / "local.py", PY_PLUGIN)
+    _write(
+        plugin_dir / "echo.toml",
+        """
+[plugin]
+name = "local.toml"
+kind = "analyzer"
+targets = ["*/*"]
+command = ["sh", "-c", "printf hello"]
+output = "text"
+""",
+    )
+    registry = PluginRegistry().load_all(Config(plugin_dirs=(plugin_dir,)))
+    assert registry.get("generic.strings") is not None
+    assert registry.get("local.example") is not None
+    assert registry.get("local.toml") is not None
+    subset = registry.subset(["generic.strings", "local.example"])
+    assert {record.name for record in subset.records} == {"generic.strings", "local.example"}
+    assert len(registry.subset(["generic.strings"]).records) == 1
+
+    without_external = registry.without_external()
+    assert without_external.get("generic.strings") is not None
+    assert without_external.get("local.example") is not None
+    assert without_external.get("local.toml") is None
+
+    with pytest.raises(PluginLoadError, match="unknown plugin"):
+        registry.subset(["does.not.exist"])
+
+
 def test_entry_point_loading(monkeypatch: pytest.MonkeyPatch) -> None:
     class EntryPlugin(Analyzer):
         name = "test.entry"

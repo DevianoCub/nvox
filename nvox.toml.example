@@ -27,6 +27,18 @@ disable = []
 # min_length = 6
 # utf16 = false
 
+# Bound the XOR brute-force decoder. Inputs larger than max_input_bytes are
+# skipped; max_candidates caps emitted text artifacts per invocation.
+# [plugins.options."decoder.xor"]
+# max_input_bytes = 16384
+# max_candidates = 5
+# min_printable = 0.75
+
+# Limit PNG LSB extraction on large images.
+# [plugins.options."image.lsb"]
+# max_pixels = 2000000
+# channels = "all"   # or a channel list/CSV, e.g. "1" or [0, 1, 2]
+
 [tools]
 # External tools that should never be invoked.
 disable = []

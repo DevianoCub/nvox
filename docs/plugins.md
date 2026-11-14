@@ -1,8 +1,10 @@
 # Plugins
 
-> **Status:** implemented in M1. The stable import surface is `nvox.api`
-> (`API_VERSION = 1`). Image and audio packs arrive in M3/M6, and command
-> plugins gain hard sandboxing in M5.
+> **Status:** implemented through M2. The stable import surface is `nvox.api`
+> (`API_VERSION = 1`). The built-in image pack currently covers EXIF strings and
+> PNG LSB; deep image analysis arrives in M3, audio in M6. Command plugins gain
+> hard sandboxing in M5 and optional process isolation for Python plugins is
+> planned for M7.
 
 Everything that analyses, extracts or decodes is a plugin. The core provides
 evidence handling, the artifact store, scheduling, flag scanning and reporting;
@@ -17,7 +19,20 @@ plugins provide techniques.
 | `Decoder` | text/bytes in, text/bytes out | base64, hex, rot13, gzip, XOR |
 
 All three are subclasses of `Plugin` and share the same scheduling contract.
-The flag engine (M2) additionally feeds candidate strings through decoders.
+Decoders are normal plugins too: their outputs return to the queue, and the flag
+scanner searches them with full provenance.
+
+## Built-in packs
+
+| Pack | Plugins | Milestone |
+|---|---|---|
+| `generic` | `generic.strings` (ASCII + UTF-16LE/BE runs) | M1 |
+| `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `xor` | M2 |
+| `image` | `image.exif` (JPEG/TIFF strings), `image.lsb` (8-bit PNG channel LSB) | M2 (minimal) |
+
+The decoder pack is intentionally conservative: base encodings must validate
+and produce meaningful text/magic, compression is magic-gated, and XOR keeps
+only the best-scored candidates. See [Flag engine](flag-engine.md).
 
 ## Discovery
 
@@ -93,6 +108,7 @@ example to skip text artifacts after extracting strings.
 | `ctx.adopt(artifact)` | Normalise an artifact the plugin constructed itself |
 | `ctx.option(name, default)` | Read a resolved option value |
 | `ctx.options` | Read-only mapping of all resolved options |
+| `ctx.max_artifact_bytes` | Maximum size for an emitted artifact |
 | `ctx.artifacts` | Artifacts emitted so far (mainly useful in tests) |
 | `ctx.skip(reason)` | Abort and record a skip with `kind="plugin"` |
 
@@ -113,7 +129,7 @@ The engine enforces `scan.max_artifact_bytes` on every emission and checks the
 plugin deadline cooperatively. Python plugins run in worker threads, which
 cannot be force-killed; a runaway plugin is abandoned at its timeout and its
 later emissions are ignored. Hard process isolation is part of M5 for command
-plugins.
+plugins and is planned as an optional mode for Python plugins in M7.
 
 Plugins must not write to the evidence or to arbitrary paths. Use the context
 to emit artifacts; the store decides where they live.
@@ -187,7 +203,7 @@ class PolicyPlugin(Analyzer):
 | `pre_ingest(path)` | Return `None` to keep the input, a reason string to refuse it |
 | `on_artifact(artifact, ctx)` | Observe a stored artifact; may emit new artifacts |
 | `post_scan(result)` | Observe the completed `ScanResult` |
-| `on_finding(finding)` | Return a (possibly modified) finding or `None`; called from M2 |
+| `on_finding(finding)` | Return a (possibly modified) finding or `None`; called by the flag engine |
 
 Hooks run in plugin priority order. An exception in a hook is isolated and
 recorded as a skip with `kind="hook"`.
@@ -216,6 +232,7 @@ loaded with a warning.
 
 ## Reference implementation
 
-`src/nvox/plugins/generic/strings.py` is the M1 reference plugin: options,
-MIME targets, `accepts` narrowing and `ctx.skip`. A copy-paste template and a
-conformance test harness are part of M7.
+`src/nvox/plugins/generic/strings.py` is the reference plugin for options,
+MIME targets, `accepts` narrowing and `ctx.skip`. The image and decoder packs
+show metadata and transform plugins. A copy-paste template and a conformance
+test harness are part of M7.

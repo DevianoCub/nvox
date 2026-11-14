@@ -109,11 +109,15 @@ Do not want a tool used even when installed? Add it to `[tools].disable`.
 
 ## What's next
 
-M1 is complete: the core engine can ingest evidence, load Python and TOML
-plugins, run an artifact graph and persist results, and you can inspect plugins
-with `nvox plugins list|info|dirs`. `nvox extract` reads artifacts from a store
-produced by the engine.
+M2 is complete: `nvox scan` compiles user formats, walks the artifact graph,
+runs the built-in decoders and reports findings with provenance. A first run:
 
-`nvox scan` and its flag engine arrive in M2; until then the scanning entry
-point is the Python API (`nvox.core.engine.Engine`). See the
-[roadmap](roadmap.md) for the order of work.
+```bash
+nvox scan photo.png --flag-format 'ctf{}'
+nvox scan ./evidence --flag-format 'htb{}' --flag 'FLAG\{[^}]+\}' -i --json
+```
+
+Findings are written to `out/findings.json`; the command exits with code `2`
+when it finds a flag. `nvox extract <sha256>` reproduces any artifact from the
+store. Deep image analysis, external bridges, audio and the HTML/TUI reports
+arrive in M3-M7. See the [roadmap](roadmap.md) for the order of work.

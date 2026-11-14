@@ -33,6 +33,24 @@ class ArtifactStore:
                 (root / "artifacts").mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 raise ArtifactStoreError(f"cannot create store at {root}: {exc}") from exc
+            self.cleanup()
+
+    def cleanup(self) -> int:
+        """Remove stale temporary files left by an interrupted write.
+
+        Stored artifacts are evidence and are never deleted automatically.
+        Returns the number of removed files.
+        """
+        if self.root is None:
+            return 0
+        removed = 0
+        for temporary in (self.root / "artifacts").rglob("*.tmp"):
+            try:
+                temporary.unlink()
+            except OSError:
+                continue
+            removed += 1
+        return removed
 
     def __len__(self) -> int:
         with self._lock:
@@ -99,8 +117,11 @@ class ArtifactStore:
             target.parent.mkdir(parents=True, exist_ok=True)
             if not target.exists():
                 temporary = target.with_suffix(".tmp")
-                temporary.write_bytes(artifact.payload)
-                os.replace(temporary, target)
+                try:
+                    temporary.write_bytes(artifact.payload)
+                    os.replace(temporary, target)
+                finally:
+                    temporary.unlink(missing_ok=True)
             index = self.root / "index.jsonl"
             with index.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(artifact.to_dict(), sort_keys=True) + "\n")

@@ -1,8 +1,10 @@
 # Forensics and evidence handling
 
 > **Status:** evidence ingestion, hashing and the content-addressed artifact
-> store are implemented in M1. Run manifests and report files land with M2/M4.
-> `docs/ru/` is reserved for the Russian translation and is empty for now.
+> store are implemented in M1. Findings and run metadata are written to
+> `findings.json` in M2. A separate manifest with Python/tool versions and the
+> self-contained HTML report land in M4. `docs/ru/` is reserved for the Russian
+> translation and is empty for now.
 
 Nvox is a triage and CTF tool, not a certified forensic suite. It is designed so
 that its output can be explained and reproduced, which is what matters both for
@@ -12,10 +14,12 @@ a write-up and for a first-pass investigation.
 
 1. **Evidence is immutable.** Input files are opened read-only. Nvox never
    edits, renames or moves them, and never writes next to them.
-2. **Everything is hashed.** Each input gets SHA-256, size, detected MIME type
-   and ingestion timestamp before any analysis runs.
-3. **Results are reproducible.** The report records Nvox version, Python
-   version and the version of every external tool that contributed.
+2. **Everything is hashed.** Each input gets SHA-256, size and detected MIME
+   type before any analysis runs. The payload is captured once, so an evidence
+   file changing on disk mid-scan cannot affect the result.
+3. **Results are reproducible.** `findings.json` records the Nvox version,
+   formats, options, evidence hashes, skips and provenance chains. External
+   tool versions are added to the run manifest in M4/M5.
 4. **Provenance is mandatory.** Every finding carries the chain of plugins and
    parameters that produced it.
 5. **No hidden network access.** Analysis is local. Bridges that would need the
@@ -23,62 +27,92 @@ a write-up and for a first-pass investigation.
 6. **Bounded and explainable skips.** Depth, time and size limits are enforced,
    and anything skipped is listed with a reason.
 
-## Planned output layout
+## Output layout (M2)
 
 ```
 out/
-  manifest.json        # evidence hashes, run metadata, tool versions
-  findings.json        # ranked findings with provenance chains
   artifacts/
-    <xx>/<sha256>      # stored artifacts (bitstreams, carved files, images)
-  index.jsonl          # append-only artifact event log
-  report.html          # self-contained report (M4)
-  run.log              # engine log with timings and skips
+    <xx>/<sha256>      # evidence, decoded payloads, bitstreams, metadata JSON
+  index.jsonl          # append-only artifact metadata log
+  findings.json        # run metadata, evidence records, findings and skips
 ```
 
-`findings.json` is the source of truth; HTML and console output are derived from
-it. `nvox report` can re-render a run without rescanning.
+`findings.json` is the source of truth for a run:
 
-## Manifest contents
+- `formats`, `patterns` and `options` describe exactly what was searched;
+- each evidence entry contains path, SHA-256, size, MIME type, artifacts and
+  skips;
+- each finding links to its evidence and artifact hash and carries the
+  first-parent provenance chain;
+- `summary` counts files, artifacts, findings, skips and plugin runs.
+
+An HTML report (`report.html`) and `nvox report` re-rendering without a rescan
+are M4 features. A combined manifest separating tool versions from findings is
+also M4; until then the report's top-level run metadata is the closest
+equivalent.
+
+## Run metadata
 
 ```json
 {
   "nvox": "0.1.0.dev0",
-  "started_at": "2026-11-13T21:00:00Z",
-  "finished_at": "2026-11-13T21:00:42Z",
+  "started_at": "2026-11-14T12:00:00Z",
+  "finished_at": "2026-11-14T12:00:06Z",
+  "formats": ["ctf{}"],
+  "patterns": [],
+  "options": {"ignore_case": false, "min_length": 4, "max_length": 200},
   "evidence": [
-    {"path": "challenge.png", "sha256": "…", "size": 913402, "mime": "image/png"}
+    {
+      "path": "challenge.png",
+      "evidence": {
+        "path": "challenge.png",
+        "sha256": "…",
+        "size": 913402,
+        "media_type": "image/png"
+      },
+      "artifacts": ["…"],
+      "skips": ["…"],
+      "findings": ["…"],
+      "plugin_runs": 42
+    }
   ],
-  "config": {"flag_formats": ["ctf{}"], "max_depth": 4, "timeout": 120},
-  "tools": [{"name": "exiftool", "version": "13.10", "path": "…"}]
+  "findings": ["…"],
+  "summary": {"files": 1, "artifacts": 42, "findings": 1, "skips": 7}
 }
 ```
 
-The evidence hash is also repeated next to every finding, so a finding can be
-tied back to exactly one input.
+The evidence hash is repeated in every finding's `evidence` object, so a finding
+can be tied back to exactly one input. The example is abridged: artifact, skip
+and finding entries contain the full records described above.
 
 ## Safety limits
 
-| Risk | Mitigation |
+| Risk | M2 mitigation |
 |---|---|
-| Zip bombs / decompression bombs | max artifact size, ratio check, depth limit |
-| Infinite plugin chains | content-hash visited set, `max_depth` |
-| Hanging external tools | per-plugin timeout (M1); process-group kill in M5 |
-| Huge output floods | artifact size cap (M1); streamed stdout/stderr caps in M5 |
-| Accidental modification | read-only opens, temp workdirs, no in-place writes |
-| Hostile parsers | subprocess isolation where practical; Python parsers kept small |
+| Zip bombs / decompression bombs | artifact size cap, decoder output cap, depth limit; ratio guard in M7 |
+| Infinite plugin chains | content-hash dedup, per-plugin visited set, `max_depth` |
+| Hanging plugins | cooperative per-plugin timeout; hard process-group kill for command plugins in M5 |
+| Huge output floods | artifact size cap; buffered command output is checked after the process exits, streaming caps in M5 |
+| Accidental modification | read-only evidence reads, separate output directory, no in-place writes |
+| Hostile parsers | small stdlib parsers with explicit bounds; process isolation for untrusted Python plugins is planned for M7 |
+
+The cooperative timeout abandons a worker thread; it cannot forcibly stop Python
+code that ignores the deadline. Do not treat M2 as a security sandbox for
+untrusted plugins. External command plugins already run as subprocesses, but
+rlimits and process-group cleanup are part of M5.
 
 ## Reporting guidance
 
 When publishing results, include:
 
-- the manifest (hashes and versions);
+- the evidence SHA-256 values and the run metadata from `findings.json`;
 - the provenance chain for each finding;
-- an explicit note about which steps were skipped and why;
+- an explicit note about which steps were skipped and why (`--verbose` lists
+  them, and they are always present in the JSON);
 - the exact command line used.
 
 This is enough for another person to reproduce the result without receiving the
-original evidence.
+original evidence, provided they can obtain the same input.
 
 ## Scope and ethics
 

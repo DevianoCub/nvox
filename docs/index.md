@@ -21,9 +21,10 @@ nvox scan photo.png --flag-format 'ctf{}'
    install. When `exiftool`, `steghide`, `binwalk`, `zsteg` and friends are
    present, they add coverage automatically.
 4. **Evidence is immutable.** Input files are opened read-only; all output goes
-   to a separate directory with SHA-256 hashes and a tool manifest.
-5. **Bounded analysis.** Depth, wall-clock time, artifact size and worker count
-   are configurable and enforced, so a hostile file cannot run forever.
+   to a separate directory and every artifact is addressed by SHA-256.
+5. **Bounded analysis.** Depth, plugin timeouts, artifact size and worker count
+   are configurable and enforced. CLI scans write findings and provenance as
+   JSON; cooperative timeouts are not a security sandbox (M5/M7 add isolation).
 
 ## Current status
 
@@ -33,17 +34,19 @@ Nvox is under active development.
 |---|---|---|
 | M0 | Bootstrap, configuration, `nvox doctor` | done |
 | M1 | Core engine: artifacts, registry, scheduler, hooks | done |
-| M2 | Flag engine: formats, decoders, XOR brute, provenance | next |
-| M3 | Deep image analysis and steganography | planned |
+| M2 | Flag engine: formats, decoders, XOR brute, provenance | done |
+| M3 | Deep image analysis and steganography | next |
 | M4 | CLI polish, HTML report, TUI | planned |
-| M5 | External tool bridges, declarative plugins | planned |
+| M5 | External tool bridges, declarative plugin hardening | planned |
 | M6 | Audio and generic file analysis | planned |
 | M7 | Hardening, docs, 0.1 release | planned |
 
-Working commands today: `nvox doctor`, `nvox plugins list|info|dirs` and
-`nvox extract`. The scanning command and its flag engine arrive with M2.
-Everything documented as "planned" describes the target design and is not
-implemented yet; each page marks its status explicitly.
+Working commands today: `nvox scan`, `nvox doctor`,
+`nvox plugins list|info|dirs` and `nvox extract`. M2 includes raw/text/metadata/
+bitstream surfaces, the built-in decoder chain, minimal EXIF and PNG LSB
+plugins, and JSON findings with provenance. Everything documented as "planned"
+describes the target design and is not implemented yet; each page marks its
+status explicitly.
 
 ## Documentation
 

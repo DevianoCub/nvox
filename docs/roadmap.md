@@ -32,27 +32,36 @@ clean messages, not tracebacks.
 - [x] `nvox plugins list|info|dirs`, `nvox extract`
 - [x] Skip records with reasons; structured engine events (`logging` plus an
       `on_event` sink)
+- [x] Store cleanup removes stale `*.tmp` files on open; evidence artifacts are
+      never auto-deleted
 
 Acceptance: the dummy chain `bytes -> text -> match` runs end to end;
 `tests/test_engine.py` covers dedup, depth, timeout, requirement/disabled skips,
 plugin errors and hooks; `tests/test_registry.py` covers discovery and TOML
 plugins; `tests/test_cli_plugins.py` covers inspection and extraction.
 
-## M2 — Flag engine
+## M2 — Flag engine (done)
 
-- [ ] Format compiler for `prefix{}` with multiple formats and `-i`
-- [ ] Raw regex mode (`--flag`) and `--min-length`
-- [ ] Surfaces: raw bytes with overlap, ASCII/UTF-16 strings, metadata, text
-      artifacts, bitstreams
-- [ ] Decoders: base64/base64url/base32/base85/hex/url/rot13/rot47/reverse/
+- [x] Format compiler for `prefix{}` with multiple formats and `-i`
+- [x] Raw regex mode (`--flag`) and `--min-length`/`--max-length`
+- [x] Surfaces: whole raw payload, ASCII/UTF-16LE/BE runs, text artifacts,
+      metadata artifacts and PNG LSB bitstreams
+- [x] Decoders: base64/base64url/base32/base85/hex/url/rot13/rot47/reverse/
       gzip/zlib/bzip2/xz
-- [ ] Recursive decoding with depth budget and visited set
-- [ ] Single-byte XOR brute force with scoring
-- [ ] Findings with context, chain, confidence; JSON output
-- [ ] Exit codes and `nvox scan` (non-TUI)
-- [ ] Fixtures: flag in EXIF base64, trailing data, XOR payload, LSB chain
+- [x] Recursive decoding with the artifact depth budget and visited set
+- [x] Single-byte XOR brute force with printable-text scoring
+- [x] Findings with context, shortest-chain provenance, confidence; JSON output
+- [x] Exit codes and `nvox scan` (non-TUI), including recursive directory scans
+- [x] Minimal `image.exif` and `image.lsb` plugins needed by the flag fixtures
+- [x] Fixtures: trailing data, base64, nested zlib, UTF-16, EXIF base64, XOR
+      payload and PNG LSB chain, generated with the standard library
 
-Acceptance: all fixtures found, no false negatives; report explains each chain.
+Acceptance: all fixtures are found end to end; report explains each chain;
+`ruff`, `mypy` and the full test suite are green.
+
+Scope note: full metadata (XMP/IPTC/ICC/PNG chunks/JPEG segments), bit planes
+1-8 and arbitrary bit orders remain M3. Chunked/streaming raw scans and
+overlapping windows remain M5/M7 performance work; M2 artifacts are in memory.
 
 ## M3 — Deep image analysis
 
@@ -81,7 +90,8 @@ report opens offline.
 
 ## M5 — Bridges and declarative plugins
 
-- [ ] `core/sandbox.py`: rlimits, process-group kill, streamed output caps
+- [ ] `core/sandbox.py`: rlimits, process-group kill, streamed output caps for
+      command plugins
 - [ ] Bridges: exiftool, zsteg, steghide, stegseek, outguess, pngcheck,
       binwalk, foremost, StegSolve, zbar, tesseract
 - [ ] Harden declarative TOML command plugins (basic runner landed in M1)
@@ -105,6 +115,8 @@ reuses the same plugin contracts as images.
 ## M7 — Hardening and 0.1
 
 - [ ] Zip-bomb and decompression-ratio guards, fuzz targets for parsers
+- [ ] Optional process isolation for untrusted Python plugins; the default
+      remains a cooperative worker-thread timeout
 - [ ] Performance pass; decide on a Rust/PyO3 accelerator using benchmarks
 - [ ] Plugin template, conformance tests, migration notes
 - [ ] Full English docs review; Russian translation in `docs/ru/`

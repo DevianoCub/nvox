@@ -187,6 +187,11 @@ class Context:
     def closed(self) -> bool:
         return self._closed
 
+    @property
+    def max_artifact_bytes(self) -> int:
+        """Size limit for artifacts emitted by this invocation."""
+        return self._max_artifact_bytes
+
     def option(self, name: str, default: Any = None) -> Any:
         """Return a resolved plugin option."""
         return self.options.get(name, default)

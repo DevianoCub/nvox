@@ -1,8 +1,8 @@
 # CLI reference
 
-> **Status:** `doctor`, `plugins list|info|dirs`, `extract` and `--version` are
-> implemented. `scan` and `report` describe the M2/M4 interface and are not
-> available yet.
+> **Status:** `scan`, `doctor`, `plugins list|info|dirs`, `extract` and
+> `--version` are implemented. `report` and the `--format`/`--tui` options are
+> M4 work and are not available yet.
 
 ## Synopsis
 
@@ -17,6 +17,97 @@ Global options:
 | `--config`, `-c PATH` | Use an explicit `nvox.toml` instead of discovery |
 | `--version`, `-V` | Print the version and exit |
 | `--help` | Show help for a command |
+
+## `nvox scan`
+
+Scans a file or a directory recursively and writes a machine-readable report.
+
+```bash
+nvox scan <path> --flag-format 'ctf{}' [options]
+```
+
+Examples:
+
+```bash
+# One file, one format
+nvox scan photo.png --flag-format 'ctf{}'
+
+# Several formats plus a custom regex, case-insensitive
+nvox scan evidence/ \
+  --flag-format 'htb{}' --flag-format 'pico{}' \
+  --flag 'FLAG\{[A-Za-z0-9_]{8,64}\}' -i
+
+# CI mode: JSON on stdout, exit code 2 when something is found
+nvox scan challenge.bin --flag-format 'ctf{}' --json --out out/
+
+# Skip expensive XOR brute force and external plugins
+nvox scan dump.bin --flag-format 'ctf{}' --no-xor-brute --no-external
+```
+
+| Option | Description |
+|---|---|
+| `--flag-format`, `-f FORMAT` | Format with one `{}` placeholder, e.g. `ctf{}`; repeatable. Falls back to `[flags].formats` |
+| `--flag REGEX` | Raw flag regular expression; repeatable |
+| `-i`, `--ignore-case` | Case-insensitive matching |
+| `--min-length N` | Minimum flag body length (default `4`) |
+| `--max-length N` | Maximum flag body length (default `200`) |
+| `--depth N` | Override `scan.max_depth` |
+| `--timeout SECONDS` | Override the per-plugin timeout |
+| `--jobs`, `-j N` | Worker count; `0` means auto |
+| `--plugins NAME,...` | Restrict the run to selected plugin names |
+| `--no-external` | Disable command plugins and plugins with external `requires` |
+| `--no-xor-brute` | Disable single-byte XOR brute force |
+| `--out`, `-o DIR` | Output directory for artifacts and `findings.json` (default `out/`) |
+| `--json` | Print the complete report as JSON on stdout |
+| `--verbose`, `-v` | Show plugin skips and their reasons |
+
+Input may be a single file or a directory. Directory scans are recursive; the
+output directory is excluded from traversal, so `nvox scan . --out out` does not
+scan its own artifacts. Unreadable or oversized inputs are recorded as skips and
+do not stop the rest of the run.
+
+Exit codes are meaningful for automation:
+
+| Code | Meaning |
+|---|---|
+| `0` | Scan completed and found no flags |
+| `1` | Usage, configuration, format or I/O error |
+| `2` | Scan completed and found at least one flag |
+| `130` | Interrupted |
+
+### Output layout
+
+```
+out/
+  artifacts/<xx>/<sha256>   # evidence, decoded layers and bitstreams
+  index.jsonl               # append-only artifact metadata log
+  findings.json             # run summary, evidence records and findings
+```
+
+`findings.json` contains the effective formats/options, one entry per input
+(hashes, MIME type, artifacts and skips), the deduplicated findings with
+provenance chains, and a summary:
+
+```json
+{
+  "nvox": "0.1.0.dev0",
+  "formats": ["ctf{}"],
+  "summary": {"files": 1, "artifacts": 42, "findings": 1, "skips": 7},
+  "findings": [
+    {
+      "value": "lsb_1s_fun",
+      "surface": "bitstream",
+      "artifact": "5f0c…",
+      "confidence": "medium",
+      "chain": [{"plugin": "image.lsb", "params": {"channel": 1}}]
+    }
+  ]
+}
+```
+
+Without `--json`, the command prints a Rich table of findings plus a summary
+line and the report path. With `--json`, stdout contains only the JSON report;
+warnings go to stderr.
 
 ## `nvox doctor`
 
@@ -58,30 +149,6 @@ The JSON form is stable enough for CI:
 
 Exit code is `0` even when tools are missing, because they are optional. A
 malformed configuration file exits with `1`.
-
-## `nvox scan` (planned, M2+)
-
-```bash
-nvox scan <path> --flag-format 'ctf{}' [options]
-```
-
-| Option | Description |
-|---|---|
-| `--flag-format FORMAT` | Flag format such as `ctf{}`, `htb{}`, `pico{}`; repeatable |
-| `--flag REGEX` | Raw regular expression instead of a format; repeatable |
-| `-i`, `--ignore-case` | Case-insensitive matching |
-| `--min-length N` | Minimum flag body length |
-| `--depth N` | Override artifact-graph depth |
-| `--timeout SECONDS` | Override per-plugin timeout |
-| `--jobs N` | Worker count |
-| `--plugins NAME,...` | Restrict to selected plugins |
-| `--no-external` | Disable all external-tool bridges |
-| `--no-xor-brute` | Skip single-byte XOR brute force |
-| `--out DIR` | Output directory (default `out/`) |
-| `--format json,html` | Report formats to write |
-| `--tui` | Open the interactive artifact browser when the scan finishes |
-
-Input may be a single file or a directory (recursive).
 
 ## `nvox plugins`
 
@@ -129,15 +196,6 @@ nvox report out/ --format html --open
 
 Re-renders reports from a previous run's `findings.json` without rescanning.
 
-## Exit codes
-
-| Code | Meaning |
-|---|---|
-| `0` | Success (for scans: no flags found) |
-| `1` | Error (bad config, unreadable input) |
-| `2` | Success, at least one flag found (scan only; useful in CI) |
-| `130` | Interrupted |
-
 ## Environment variables
 
 | Variable | Effect |
@@ -156,7 +214,7 @@ max_artifact_bytes = 67108864
 jobs = 0
 
 [flags]
-formats = ["ctf{}"]
+formats = ["ctf{}"]      # defaults used when --flag-format is absent
 
 [plugins]
 dirs = ["plugins", "~/.config/nvox/plugins"]
@@ -165,6 +223,13 @@ disable = []             # plugin names that must never run
 [plugins.options."generic.strings"]
 min_length = 6
 utf16 = false
+
+[plugins.options."decoder.xor"]
+max_input_bytes = 16384
+max_candidates = 5
+
+[plugins.options."image.lsb"]
+max_pixels = 2000000
 
 [tools]
 disable = ["steghide"]

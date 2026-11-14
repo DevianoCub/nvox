@@ -24,6 +24,8 @@ from nvox.api import (
 )
 from nvox.core.config import Config
 from nvox.core.evidence import Evidence, EvidenceError, EvidenceTooLarge
+from nvox.core.findings import Finding, better_finding, build_chain, finding_rank
+from nvox.core.flags import FlagScanner
 from nvox.core.hooks import HookManager, HookOutcome
 from nvox.core.registry import PluginRegistry
 from nvox.core.store import ArtifactStore, ArtifactStoreError
@@ -32,6 +34,7 @@ SkipKind = Literal["hook", "input", "disabled", "requirement", "timeout", "error
 EventSink = Callable[[str, Mapping[str, Any]], None]
 
 MAX_PLUGIN_RUNS = 10000
+MAX_FINDINGS = 1000
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,7 @@ class ScanResult:
     skips: tuple[Skip, ...]
     duration: float
     plugin_runs: int
+    findings: tuple[Finding, ...] = ()
 
     @property
     def root(self) -> Artifact | None:
@@ -96,6 +100,7 @@ class ScanResult:
             ),
             "artifacts": [artifact.to_dict() for artifact in self.artifacts],
             "skips": [skip.to_dict() for skip in self.skips],
+            "findings": [finding.to_dict() for finding in self.findings],
             "duration": self.duration,
             "plugin_runs": self.plugin_runs,
         }
@@ -114,6 +119,7 @@ class Engine:
         jobs: int | None = None,
         logger: logging.Logger | None = None,
         on_event: EventSink | None = None,
+        flag_scanner: FlagScanner | None = None,
     ) -> None:
         self.config = config
         self.registry = registry if registry is not None else PluginRegistry().load_all(config)
@@ -126,11 +132,16 @@ class Engine:
         self.jobs = jobs if jobs is not None else config.limits.effective_jobs()
         self.log = logger if logger is not None else logging.getLogger("nvox.engine")
         self._events = on_event
+        self.flag_scanner = flag_scanner
         self._visited: set[tuple[str, str, str]] = set()
         self._blockers: dict[str, Skip] = {}
         self._hooks_done: set[str] = set()
         self._scan_artifacts: dict[str, Artifact] = {}
         self._enqueued: set[str] = set()
+        self._scanned: set[tuple[str, str, tuple[str, ...], int]] = set()
+        self._findings: dict[str, Finding] = {}
+        self._evidence_sha256 = ""
+        self._evidence_path = ""
 
     def analyze(self, path: Path) -> ScanResult:
         """Ingest ``path`` and run the plugin graph over it."""
@@ -142,6 +153,10 @@ class Engine:
         self._hooks_done.clear()
         self._scan_artifacts.clear()
         self._enqueued.clear()
+        self._scanned.clear()
+        self._findings.clear()
+        self._evidence_sha256 = ""
+        self._evidence_path = ""
 
         self._event("scan_start", {"path": str(path)})
         refused = self.hooks.pre_ingest(Path(path))
@@ -161,9 +176,12 @@ class Engine:
 
         root = evidence.to_artifact()
         stored_root, _ = self.store.add(root)
+        self._evidence_sha256 = evidence.sha256
+        self._evidence_path = str(evidence.path)
         self._scan_artifacts[stored_root.sha256] = stored_root
         self._enqueued.add(stored_root.sha256)
         self._event("artifact", stored_root.to_dict())
+        self._scan_findings(stored_root, skips)
         queue: deque[Artifact] = deque([stored_root])
 
         executor = ThreadPoolExecutor(max_workers=max(1, self.jobs))
@@ -366,11 +384,59 @@ class Engine:
             )
             return None
         self._scan_artifacts.setdefault(stored.sha256, stored)
+        self._scan_findings(child, skips)
         if stored.sha256 not in self._enqueued:
             self._enqueued.add(stored.sha256)
             queue.append(stored)
             self._event("artifact", stored.to_dict())
         return stored
+
+    def _scan_findings(self, artifact: Artifact, skips: list[Skip]) -> None:
+        scanner = self.flag_scanner
+        if scanner is None:
+            return
+        key = (artifact.sha256, artifact.producer, artifact.parents, artifact.depth)
+        if key in self._scanned:
+            return
+        self._scanned.add(key)
+        try:
+            raw_findings = scanner.scan(artifact)
+        except Exception as exc:
+            self.log.debug("flag scanner failed on %s", artifact.sha256, exc_info=exc)
+            skips.append(
+                Skip(
+                    plugin="flag.scanner",
+                    artifact=artifact.sha256,
+                    reason=f"{type(exc).__name__}: {exc}",
+                    kind="error",
+                )
+            )
+            return
+        if not raw_findings:
+            return
+        chain = build_chain(artifact, self.store)
+        for raw in raw_findings:
+            if len(self._findings) >= MAX_FINDINGS and raw.value not in self._findings:
+                break
+            finding = replace(
+                raw,
+                chain=chain,
+                evidence_sha256=self._evidence_sha256,
+                evidence_path=self._evidence_path,
+            )
+            hooked = self.hooks.on_finding(finding)
+            if hooked is None or not isinstance(hooked, Finding):
+                continue
+            if not hooked.chain:
+                hooked = replace(hooked, chain=chain)
+            if not hooked.evidence_sha256:
+                hooked = replace(
+                    hooked,
+                    evidence_sha256=self._evidence_sha256,
+                    evidence_path=self._evidence_path,
+                )
+            self._findings[hooked.value] = better_finding(self._findings.get(hooked.value), hooked)
+            self._event("finding", hooked.to_dict())
 
     def _blocker(self, plugin: Plugin) -> Skip | None:
         if plugin.name in self.config.disabled_plugins:
@@ -451,6 +517,7 @@ class Engine:
             skips=tuple(sorted(skips, key=lambda skip: (skip.kind, skip.plugin, skip.artifact))),
             duration=time.monotonic() - started,
             plugin_runs=runs,
+            findings=tuple(sorted(self._findings.values(), key=finding_rank)),
         )
         post_errors = self.hooks.post_scan(result)
         if post_errors:
@@ -470,6 +537,7 @@ class Engine:
             {
                 "artifacts": len(result.artifacts),
                 "skips": len(result.skips),
+                "findings": len(result.findings),
                 "duration": round(result.duration, 6),
             },
         )

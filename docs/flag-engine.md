@@ -1,7 +1,8 @@
 # Flag engine
 
-> **Status:** planned for M2. This page defines the behaviour to implement and
-> the semantics users can rely on.
+> **Status:** implemented in M2 for raw/text/metadata/bitstream surfaces and the
+> built-in decoder chain. Deep image metadata (XMP, IPTC, ICC), full bit-plane
+> coverage and HTML/TUI reporting remain M3/M4.
 
 The flag engine takes user-defined formats and searches every surface Nvox can
 produce. It is the reason the artifact graph exists: a flag only visible after
@@ -9,8 +10,8 @@ produce. It is the reason the artifact graph exists: a flag only visible after
 
 ## Format syntax
 
-A format is a literal prefix/suffix pattern where `{}` is the **only**
-placeholder and stands for the flag body:
+A format is a literal pattern with exactly one `{}` placeholder. The braces are
+part of the flag syntax, so `ctf{}` matches `ctf{...}`:
 
 | Format | Matches |
 |---|---|
@@ -19,11 +20,12 @@ placeholder and stands for the flag body:
 | `pico{}` | `pico{...}` |
 | `flag{}` | `flag{...}` |
 
-Everything outside `{}` is escaped literally, so `HTB{}` does not match
+Everything outside `{}` is escaped literally. `HTB{}` does not match
 `htb{...}` unless `-i` is given. The body is non-empty and does not cross a
-newline; the default maximum body length is 200 characters.
+newline. Minimum and maximum body lengths default to 4 and 200 characters and
+are controlled by `--min-length` / `--max-length`.
 
-Formats are repeatable and can be combined:
+Formats are repeatable:
 
 ```bash
 nvox scan evidence/ --flag-format 'ctf{}' --flag-format 'htb{}' --flag-format 'pico{}'
@@ -36,49 +38,61 @@ expression with `--flag`:
 nvox scan dump.bin --flag 'FLAG\{[A-Za-z0-9_]{8,64}\}' -i
 ```
 
-Multiple formats are compiled into a single alternation with named groups, so a
-scan does not cost more per added format.
+Each format and raw pattern is compiled separately, which keeps the original
+format label in every finding. Overlapping matches are deduplicated by value.
 
 ## Surfaces
 
-| Surface | What is scanned |
+| Surface | M2 implementation |
 |---|---|
-| Raw bytes | Evidence and artifacts, sliding window with overlap |
-| Strings | ASCII and UTF-16LE/BE runs, including `strings`-style minimum length |
-| Metadata | EXIF, XMP, IPTC, ICC, PNG chunks, JPEG segments, audio tags |
-| Text artifacts | Every `text` artifact produced by analyzers |
-| Bitstreams | LSB/LSB2/... planes, both bit orders, row and column major |
+| Raw bytes | The complete in-memory artifact payload |
+| Strings | ASCII and UTF-16LE/BE runs, with absolute byte offsets |
+| Text artifacts | Every `text` artifact produced by analyzers or decoders |
+| Metadata | JSON metadata artifacts and EXIF string values |
+| Bitstreams | Artifacts emitted by the PNG LSB plugin |
 | Decoded layers | Output of the decoder chain, recursively |
 
-Raw scanning uses a window with overlap equal to the longest possible match, so
-a flag split across a chunk boundary is not missed. Surfaces are deduplicated,
-so scanning a text artifact that came from raw bytes does not double-report.
+The scanner searches both raw bytes and text runs. A match found by both is
+reported once, with the more structured surface. M3 expands metadata to
+XMP/IPTC/ICC, PNG chunks and all JPEG segments, and expands bit planes to bits
+1-8, both bit orders and row/column layouts.
 
 ## Decoder chain
 
-Decoders are plugins. Built-ins (M2):
+Decoders are plugins under `src/nvox/plugins/decoders/`. Built-ins:
 
 `base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`,
 `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, single-byte `xor` (brute force).
 
-The engine applies decoders breadth-first with:
+They run as ordinary plugins, so every decoded layer is stored, hashed and fed
+back into the graph. The engine applies them breadth-first with:
 
-- a depth budget (default 3 decoder layers, bounded by `scan.max_depth`);
-- a visited set keyed by SHA-256, so cycles terminate;
-- heuristic gating: base64/hex are only attempted on inputs that plausibly
-  decode, and decompression only when the magic bytes match;
-- a per-input and global time budget.
+- the normal artifact depth budget (`scan.max_depth`, default 4);
+- per-plugin visited keys and content-addressed storage, so cycles terminate;
+- heuristic gating: base encodings must validate and decode to meaningful text
+  or a known magic; decompression requires the container magic;
+- decompression output caps (`scan.max_artifact_bytes`);
+- a per-invocation timeout and the global plugin-run budget.
 
-Every attempt is recorded, including unsuccessful decodes when `--verbose` is
-set, because "what was ruled out" matters in a report.
+Unsuccessful attempts are recorded as plugin skips with a reason. Use
+`nvox scan --verbose` to inspect them.
 
 ## XOR brute force
 
-Classic CTF payloads are often obfuscated with a single-byte XOR. For inputs up
-to a configurable size, Nvox tries all 255 non-zero keys, scores the result and
-runs the flag patterns on promising candidates. Scoring favours printable
-ratio, presence of English/CTF keywords and a successful flag match. Disable
-with `--no-xor-brute`.
+For byte artifacts up to 16 KiB by default, Nvox tries all 255 non-zero
+single-byte keys, scores the results and emits the best candidates as text
+artifacts. The scanner then searches those artifacts normally. Scoring favours
+printable text, letters/digits, brace pairs and CTF keywords. The defaults are
+deliberately conservative to keep the artifact graph bounded:
+
+```toml
+[plugins.options."decoder.xor"]
+max_input_bytes = 16384
+max_candidates = 5
+min_printable = 0.75
+```
+
+Disable the technique with `--no-xor-brute`.
 
 ## Findings
 
@@ -86,26 +100,42 @@ A finding is not just a string:
 
 ```json
 {
-  "value": "ctf{lsb_1s_fun}",
+  "value": "lsb_1s_fun",
   "format": "ctf{}",
   "surface": "bitstream",
-  "offset": 8128,
-  "context": "...leading bytes [ctf{lsb_1s_fun}] trailing...",
-  "artifact": "sha256:5f0c...",
+  "offset": 128,
+  "context": "…leading bytes ctf{lsb_1s_fun} trailing…",
+  "artifact": "5f0c…",
+  "confidence": "medium",
   "chain": [
-    {"plugin": "image.lsb_planes", "params": {"channel": 2, "bits": 1}},
-    {"plugin": "decoder.zlib"},
-    {"plugin": "decoder.base64"}
+    {
+      "plugin": "image.lsb",
+      "name": "lsb/channel=1",
+      "sha256": "5f0c…",
+      "params": {"bit": 1, "channel": 1}
+    },
+    {
+      "plugin": "decoder.base64",
+      "name": "base64",
+      "sha256": "9a31…",
+      "params": {"codec": "base64"}
+    }
   ],
-  "confidence": "high"
+  "evidence": {"sha256": "…", "path": "photo.png"}
 }
 ```
 
 - **offset** is relative to the artifact where the match was found, not the
-  original evidence; the chain explains how to get there.
-- **chain** is the provenance path. `nvox extract` can reproduce any step.
-- **confidence** reflects the surface and the number of independent matches:
-  exact metadata or text matches are higher confidence than a single XOR hit.
+  original evidence. The chain explains how to get there.
+- **chain** is the first-parent provenance path from evidence to artifact. The
+  evidence root itself is not a transformation step, so a direct evidence match
+  has an empty chain.
+- **artifact** is the SHA-256 of the artifact that contains the match;
+  `nvox extract <sha256>` writes it back to disk.
+- **confidence** is surface-based: `high` for text/metadata, `medium` for
+  strings, bitstreams and XOR candidates, `low` for a direct raw-byte match.
+  When the same value is found through several chains, the shortest chain wins,
+  then the higher confidence.
 
 ## False positives
 
@@ -113,9 +143,11 @@ Generic-looking patterns such as `flag{}` can match documentation or test
 fixtures. Mitigations:
 
 - require a minimum body length (default 4, configurable);
-- prefer structured surfaces over raw byte noise when ranking;
-- allow `on_finding` hooks to drop matches;
-- never hide lower-confidence findings, but sort them last and mark them.
+- prefer structured surfaces and shorter provenance chains when the same value
+  is found more than once;
+- allow `on_finding` hooks to modify or drop matches;
+- keep every distinct value, but report one best occurrence per value and
+  evidence file.
 
 ## CLI summary
 
@@ -123,4 +155,8 @@ fixtures. Mitigations:
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./dump --flag 'flag\{[^}]+\}' -i --min-length 8
 nvox scan image.png --flag-format 'htb{}' --no-xor-brute --out out/
+nvox scan image.png --flag-format 'pico{}' --json
 ```
+
+Exit code `2` means at least one flag was found, so the command works directly
+in CI. `findings.json` is written under `--out` even without `--json`.

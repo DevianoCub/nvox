@@ -60,6 +60,31 @@ def test_store_persists_payloads_and_index(tmp_path: Path) -> None:
     assert len(lines) == 1
 
 
+def test_store_removes_stale_temporary_files(tmp_path: Path) -> None:
+    root = tmp_path / "out"
+    artifacts = root / "artifacts" / "ab"
+    artifacts.mkdir(parents=True)
+    stale = artifacts / "abandoned.tmp"
+    stale.write_bytes(b"partial")
+    real = artifacts / "real-artifact"
+    real.write_bytes(b"evidence")
+
+    store = ArtifactStore(root=root)
+    assert not stale.exists()
+    assert real.read_bytes() == b"evidence"
+    assert store.cleanup() == 0
+
+
+def test_store_cleanup_reports_removed_files(tmp_path: Path) -> None:
+    store = ArtifactStore(root=tmp_path / "out")
+    stale = store.root / "artifacts" / "cd" / "interrupted.tmp" if store.root else None
+    assert stale is not None
+    stale.parent.mkdir(parents=True, exist_ok=True)
+    stale.write_bytes(b"partial")
+    assert store.cleanup() == 1
+    assert not stale.exists()
+
+
 def test_store_by_kind_and_require() -> None:
     store = ArtifactStore()
     text = store.put(make_artifact(kind=ArtifactKind.TEXT, name="t", payload=b"hello"))

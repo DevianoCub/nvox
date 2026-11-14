@@ -51,6 +51,11 @@ class RegisteredPlugin:
         return self.plugin.name
 
 
+def is_external(record: RegisteredPlugin) -> bool:
+    """Whether a plugin runs external tooling (command plugin or ``requires``)."""
+    return bool(record.plugin.requires) or record.source.endswith(".toml")
+
+
 class PluginRegistry:
     """Holds plugin instances and loads them from all supported sources."""
 
@@ -182,6 +187,27 @@ class PluginRegistry:
         """Return plugins accepting ``artifact``, highest priority first."""
         return tuple(plugin for plugin in self.plugins if plugin.accepts(artifact))
 
+    def subset(self, names: Sequence[str]) -> PluginRegistry:
+        """Return a new registry containing only ``names``.
+
+        Raises:
+            PluginLoadError: if a requested plugin is unknown.
+        """
+        selected = PluginRegistry()
+        selected.warnings = list(self.warnings)
+        selected._loaded = True
+        for name in names:
+            record = self._records.get(name)
+            if record is None:
+                raise PluginLoadError(f"unknown plugin: {name}")
+            selected._records[name] = record
+        return selected
+
+    def without_external(self) -> PluginRegistry:
+        """Return a registry without command plugins or external tool bridges."""
+        names = [record.name for record in self._records.values() if not is_external(record)]
+        return self.subset(names)
+
     def requirements(self, plugin: Plugin) -> dict[str, bool]:
         """Return availability of each external requirement of ``plugin``."""
         return {name: shutil.which(name) is not None for name in plugin.requires}
@@ -269,4 +295,5 @@ __all__ = [
     "PluginLoadError",
     "PluginRegistry",
     "RegisteredPlugin",
+    "is_external",
 ]

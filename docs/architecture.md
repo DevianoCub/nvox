@@ -41,10 +41,12 @@ technique-specific glue.
 | `core/engine.py` | Queue, priorities, timeouts, depth/size budgets, dedup, workers | M1 |
 | `core/hooks.py` | `pre_ingest`, `on_artifact`, `post_scan`, `on_finding` dispatch | M1 |
 | `core/command_plugin.py` | Declarative TOML command plugins | M1 |
-| `core/flags.py` | Flag format compiler and surface scanning | M2 |
-| `core/decoders.py` | Base64/base32/hex/rot/xor/zlib/... transforms | M2 |
-| `core/findings.py` | Findings, context, provenance chain | M2 |
-| `core/report/` | JSON and self-contained HTML reports | M2/M4 |
+| `core/surfaces.py` | ASCII/UTF-16LE/BE runs with byte offsets | M2 |
+| `core/flags.py` | Flag format compiler, raw regex, surface scan | M2 |
+| `core/findings.py` | Findings, confidence, provenance chain | M2 |
+| `plugins/decoders/` | Base64/base32/hex/rot/xor/gzip/... transform plugins | M2 |
+| `plugins/image/` | Minimal EXIF strings and PNG LSB planes | M2 |
+| `core/report/` | Self-contained HTML report | M4 (planned) |
 | `core/config.py` | `nvox.toml` discovery and validation | M0 |
 | `core/tools.py` | External tool registry and detection | M0 |
 | `core/doctor.py` | Environment diagnostics | M0 |
@@ -72,8 +74,8 @@ plugins named them differently; plugins should emit derived content rather than
 a byte-identical reinterpretation of their input.
 
 The store enforces `max_artifact_bytes`; anything larger is recorded as a skip
-with a reason instead of being materialised. With `--store` (or a future
-`scan --out`), payloads and `index.jsonl` are mirrored to disk.
+with a reason instead of being materialised. `nvox scan --out DIR` and
+`nvox extract --store DIR` mirror payloads and `index.jsonl` to disk.
 
 ## Plugin types
 
@@ -96,7 +98,8 @@ no core changes. See [Plugins](plugins.md).
   plugins run in worker threads and check a cooperative deadline on emission;
   a hung plugin is abandoned at its timeout and late emissions are ignored.
   Command plugins additionally receive a subprocess timeout. Hard process
-  isolation lands in M5.
+  isolation lands in M5 for command plugins and is planned as an optional mode
+  for Python plugins in M7.
 - **Size** (`scan.max_artifact_bytes`): upper bound for materialised artifacts;
   oversized emissions become skips.
 - **Workers** (`scan.jobs`, default auto): up to this many plugin invocations
@@ -123,11 +126,11 @@ Hooks are the supported way to change core behaviour without editing the core:
 | `pre_ingest(path)` | before evidence is hashed | reject/filter inputs; return a reason string |
 | `on_artifact(artifact, ctx)` | when an artifact is stored | attach external analysis, emit extra artifacts |
 | `post_scan(result)` | after the queue drains | aggregate, re-rank, export |
-| `on_finding(finding)` | for each flag match (M2) | suppress false positives, notify |
+| `on_finding(finding)` | for each flag match | suppress false positives, notify |
 
-Plugins can also override services (flag scanner, reporter, artifact store)
-through configuration. This is deliberately a coarser extension point: it is
-powerful, so the default implementations stay dependency-free.
+The flag scanner is passed to the engine as an optional component
+(`Engine(flag_scanner=...)`), so it can be replaced programmatically by API
+users. Configuration-level service overrides are not implemented yet.
 
 ## Why Python, and when native code
 
@@ -147,11 +150,12 @@ accelerators, not as the definition of a feature.
 
 ## Extension points
 
-1. Built-in plugin packs: `src/nvox/plugins/{image,audio,generic,bridges}`.
+1. Built-in plugin packs: `src/nvox/plugins/{generic,decoders,image}` today;
+   `audio` and `bridges` are planned for M6/M5.
 2. Local plugin directories: `./plugins`, `~/.config/nvox/plugins`.
 3. Installed packages exposing the `nvox.plugins` entry point.
 4. Declarative TOML plugins wrapping any command.
-5. Hooks and service overrides in `nvox.toml`.
+5. Hooks in plugins.
 
 API stability is governed by `nvox.api.API_VERSION` (currently `1`). Breaking
 changes bump the major version and plugins declare the API version they target.
