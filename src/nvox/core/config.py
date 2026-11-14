@@ -92,6 +92,7 @@ class Config:
             ConfigError: if the file exists but is unreadable or malformed.
         """
         root = cwd if cwd is not None else Path.cwd()
+        path: Path | None
         if explicit is not None:
             path = explicit.expanduser()
             if not path.is_file():

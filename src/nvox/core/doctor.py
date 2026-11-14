@@ -147,9 +147,13 @@ def render(console: Console, report: DoctorReport) -> None:
             if tool["category"] != category:
                 continue
             status = "[green]*[/]" if tool["found"] else "[dim]o[/]"
-            location = escape(tool["path"]) if tool["path"] else "[dim]not installed[/]"
-            if tool.get("version"):
-                location = f"{location}\n[dim]{escape(tool['version'])}[/]"
+            location = "[dim]not installed[/]"
+            tool_path = tool["path"]
+            if tool_path is not None:
+                location = escape(tool_path)
+            tool_version = tool["version"]
+            if tool_version:
+                location = f"{location}\n[dim]{escape(tool_version)}[/]"
             table.add_row(status, tool["name"], tool["purpose"], location, tool["stage"])
         console.print(table)
         console.print()
