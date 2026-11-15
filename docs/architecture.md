@@ -23,7 +23,7 @@
                                |  decoding chain |      +--------+--------+
                                +-----------------+               |
                                                                  v
-                                                      JSON / HTML / TUI
+                                           JSON (HTML/TUI planned for M4)
 ```
 
 The loop is the important part: an analyzer that yields a new artifact puts it
@@ -92,8 +92,9 @@ no core changes. See [Plugins](plugins.md).
 
 - **Depth** (`scan.max_depth`, default 4): how many derivation steps away from
   the evidence a technique may run. The evidence artifact is depth 0; a plugin
-  runs while its input depth is below the limit. `PNG -> LSB -> zlib -> base64
-  -> flag` is four steps.
+  runs while its input depth is below the limit. A chain such as
+  `PNG -> LSB -> zlib -> base64 -> flag` uses three derivations plus the flag
+  match, and fits within the default limit of four.
 - **Timeout** (`scan.timeout`, default 120s): per plugin invocation. Python
   plugins run in worker threads and check a cooperative deadline on emission;
   a hung plugin is abandoned at its timeout and late emissions are ignored.

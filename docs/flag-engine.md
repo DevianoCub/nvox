@@ -38,8 +38,10 @@ expression with `--flag`:
 nvox scan dump.bin --flag 'FLAG\{[A-Za-z0-9_]{8,64}\}' -i
 ```
 
-Each format and raw pattern is compiled separately, which keeps the original
-format label in every finding. Overlapping matches are deduplicated by value.
+Raw patterns define their own bounds. M2 compiles them for byte scanning, so
+Unicode-only constructs that cannot be encoded as bytes are rejected. Each
+format and raw pattern is compiled separately, which keeps the original format
+label in every finding. Overlapping matches are deduplicated by value.
 
 ## Surfaces
 

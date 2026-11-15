@@ -71,9 +71,13 @@ Exit codes are meaningful for automation:
 | Code | Meaning |
 |---|---|
 | `0` | Scan completed and found no flags |
-| `1` | Usage, configuration, format or I/O error |
+| `1` | Nvox configuration, format, option or I/O error |
 | `2` | Scan completed and found at least one flag |
-| `130` | Interrupted |
+
+Typer/Click itself also exits with `2` for malformed command-line usage (for
+example an unknown option). Nvox validation errors raised after parsing use
+`1`; CI should therefore check both the exit code and `summary.findings` when
+distinguishing usage failures from findings.
 
 ### Output layout
 
