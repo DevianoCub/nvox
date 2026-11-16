@@ -21,6 +21,8 @@ nav:
   - CLI reference: cli.md
   - Plugins: plugins.md
   - Flag engine: flag-engine.md
+  - Image analysis: image-analysis.md
+  - Tooling setup: tooling.md
   - Forensics: forensics.md
   - Development: development.md
   - Roadmap: roadmap.md

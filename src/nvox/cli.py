@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json as jsonlib
 from dataclasses import replace
@@ -307,12 +308,19 @@ def scan(
         bool,
         typer.Option("--json", help="Emit the complete report as JSON on stdout."),
     ] = False,
+    csv_output: Annotated[
+        bool,
+        typer.Option(
+            "--csv",
+            help="Write out/artifacts.csv with one row per artifact.",
+        ),
+    ] = False,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Show skips and per-plugin failures."),
     ] = False,
 ) -> None:
-    """Scan evidence for flags across raw, text, metadata and decoded surfaces."""
+    """Analyse evidence; search for flags when a format or pattern is supplied."""
     started_at = datetime.now(UTC)
     config = _load_config(ctx)
     config = _config_with_limits(
@@ -323,16 +331,20 @@ def scan(
     )
     requested_formats = list(flag_formats or ()) or list(config.flag_formats)
     requested_patterns = list(patterns or ())
-    try:
-        specs = build_flag_specs(
-            requested_formats,
-            requested_patterns,
-            ignore_case=ignore_case,
-            min_length=min_length,
-            max_length=max_length,
-        )
-    except FlagFormatError as exc:
-        _fail(str(exc))
+    flag_search = bool(requested_formats or requested_patterns)
+    scanner: FlagScanner | None = None
+    if flag_search:
+        try:
+            specs = build_flag_specs(
+                requested_formats,
+                requested_patterns,
+                ignore_case=ignore_case,
+                min_length=min_length,
+                max_length=max_length,
+            )
+        except FlagFormatError as exc:
+            _fail(str(exc))
+        scanner = FlagScanner(specs)
 
     registry = _load_registry(config, json_output=json_output)
     registry = _filter_registry(
@@ -353,7 +365,7 @@ def scan(
         config,
         registry=registry,
         store=store,
-        flag_scanner=FlagScanner(specs),
+        flag_scanner=scanner,
         jobs=config.limits.effective_jobs(),
     )
 
@@ -365,6 +377,7 @@ def scan(
     report = _build_report(
         results,
         findings,
+        mode="flags" if flag_search else "artifacts",
         formats=requested_formats,
         patterns=requested_patterns,
         ignore_case=ignore_case,
@@ -381,10 +394,26 @@ def scan(
     except OSError as exc:
         _fail(f"cannot write {report_path}: {exc}")
 
+    csv_path = out_dir / "artifacts.csv" if csv_output else None
+    if csv_path is not None:
+        try:
+            _write_artifacts_csv(report, csv_path)
+        except OSError as exc:
+            _fail(f"cannot write {csv_path}: {exc}")
+
     if json_output:
         typer.echo(jsonlib.dumps(report, indent=2, ensure_ascii=False))
     else:
-        _render_scan(report, results, findings, report_path, verbose=verbose, target=path)
+        _render_scan(
+            report,
+            results,
+            findings,
+            report_path,
+            verbose=verbose,
+            target=path,
+            flag_search=flag_search,
+            csv_path=csv_path,
+        )
     if findings:
         raise typer.Exit(code=2)
 
@@ -528,6 +557,7 @@ def _build_report(
     results: list[tuple[Path, ScanResult]],
     findings: list[Finding],
     *,
+    mode: str,
     formats: list[str],
     patterns: list[str],
     ignore_case: bool,
@@ -545,6 +575,7 @@ def _build_report(
         "started_at": started_at.isoformat(),
         "finished_at": finished_at.isoformat(),
         "duration": round((finished_at - started_at).total_seconds(), 6),
+        "mode": mode,
         "formats": formats,
         "patterns": patterns,
         "options": {
@@ -565,6 +596,52 @@ def _build_report(
     }
 
 
+_ARTIFACT_CSV_FIELDS = (
+    "evidence_path",
+    "evidence_sha256",
+    "artifact_sha256",
+    "producer",
+    "kind",
+    "name",
+    "media_type",
+    "size",
+    "depth",
+    "parents",
+    "params",
+)
+
+
+def _write_artifacts_csv(report: dict[str, Any], path: Path) -> None:
+    """Write one CSV row per artifact for spreadsheet-friendly triage."""
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=_ARTIFACT_CSV_FIELDS)
+        writer.writeheader()
+        for entry in report.get("evidence", []):
+            evidence_path = entry.get("path", "")
+            evidence = entry.get("evidence") or {}
+            evidence_sha256 = evidence.get("sha256", "")
+            for artifact in entry.get("artifacts", []):
+                writer.writerow(
+                    {
+                        "evidence_path": evidence_path,
+                        "evidence_sha256": evidence_sha256,
+                        "artifact_sha256": artifact.get("sha256", ""),
+                        "producer": artifact.get("producer", ""),
+                        "kind": artifact.get("kind", ""),
+                        "name": artifact.get("name", ""),
+                        "media_type": artifact.get("media_type", ""),
+                        "size": artifact.get("size", 0),
+                        "depth": artifact.get("depth", 0),
+                        "parents": jsonlib.dumps(
+                            artifact.get("parents", []), separators=(",", ":")
+                        ),
+                        "params": jsonlib.dumps(
+                            artifact.get("params", {}), separators=(",", ":"), sort_keys=True
+                        ),
+                    }
+                )
+
+
 def _render_scan(
     report: dict[str, Any],
     results: list[tuple[Path, ScanResult]],
@@ -573,9 +650,16 @@ def _render_scan(
     *,
     verbose: bool,
     target: Path,
+    flag_search: bool,
+    csv_path: Path | None,
 ) -> None:
     console.print(f"[bold]Nvox scan[/] {escape(str(target))}")
-    if findings:
+    if not flag_search:
+        console.print(
+            "[bold]Artifact-only mode[/] — no flag formats supplied; "
+            "full artifact data is written to the report."
+        )
+    elif findings:
         table = Table(title="Findings", title_justify="left")
         table.add_column("Flag", style="bold", overflow="fold")
         table.add_column("Conf", no_wrap=True)
@@ -622,6 +706,8 @@ def _render_scan(
         f"{summary['findings']} finding(s) in {summary['duration']:.2f}s[/]"
     )
     console.print(f"[dim]report: {escape(str(report_path))}[/]")
+    if csv_path is not None:
+        console.print(f"[dim]artifacts CSV: {escape(str(csv_path))}[/]")
 
 
 def _all_skips(results: list[tuple[Path, ScanResult]]) -> list[Skip]:

@@ -1,9 +1,10 @@
 # Nvox
 
 Nvox is a modular forensic and steganography analysis framework for images,
-audio and arbitrary files. Give it a file and a flag format, and it walks an
-artifact graph — LSB planes, metadata, embedded files, decoded payloads — looking
-for matches, while keeping a provenance trail for everything it finds.
+audio and arbitrary files. Give it a file and an optional flag format, and it
+walks an artifact graph — LSB planes, metadata, embedded files, decoded payloads
+— looking for matches or collecting artifacts for later triage, while keeping a
+provenance trail for everything it finds.
 
 ```bash
 nvox scan photo.png --flag-format 'ctf{}'
@@ -35,7 +36,7 @@ Nvox is under active development.
 | M0 | Bootstrap, configuration, `nvox doctor` | done |
 | M1 | Core engine: artifacts, registry, scheduler, hooks | done |
 | M2 | Flag engine: formats, decoders, XOR brute, provenance | done |
-| M3 | Deep image analysis and steganography | implemented |
+| M3 | Deep image analysis and steganography | done |
 | M4 | CLI polish, HTML report, TUI | next |
 | M5 | External tool bridges, declarative plugin hardening | planned |
 | M6 | Audio and generic file analysis | planned |
@@ -45,8 +46,10 @@ Working commands today: `nvox scan`, `nvox doctor`,
 `nvox plugins list|info|dirs` and `nvox extract`. M3 adds deep PNG/JPEG/GIF/BMP/
 TIFF metadata, configurable PNG bit planes, palette/alpha/channel analysis,
 trailing/prepended and polyglot detection, embedded-container carving and raw
-DEFLATE decoding. Everything documented as "planned" describes the target
-design and is not implemented yet; each page marks its status explicitly.
+DEFLATE decoding. `nvox scan` also runs without a flag format: it writes the
+complete artifact report to JSON/CSV instead of printing everything in the
+terminal. Everything documented as "planned" describes the target design and is
+not implemented yet; each page marks its status explicitly.
 
 ## Documentation
 
@@ -56,6 +59,7 @@ design and is not implemented yet; each page marks its status explicitly.
 - [Plugins](plugins.md)
 - [Image analysis](image-analysis.md)
 - [Flag engine](flag-engine.md)
+- [Tooling setup](tooling.md)
 - [Forensics and evidence handling](forensics.md)
 - [Development](development.md)
 - [Roadmap](roadmap.md)

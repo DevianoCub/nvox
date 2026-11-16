@@ -2,9 +2,9 @@
 
 Nvox is a modular forensic and steganography analysis framework for images,
 audio and arbitrary files. It is built for CTF work and for forensic triage:
-point it at a file, give it the flag format, and it explores the artifact graph
-(LSB planes, metadata, embedded files, decoded payloads, ...) looking for
-matches.
+point it at a file and optionally give it a flag format, then it explores the
+artifact graph (LSB planes, metadata, embedded files, decoded payloads, ...)
+looking for matches or collecting everything it can extract.
 
 ```
 nvox scan photo.png --flag-format 'ctf{}'
@@ -12,8 +12,8 @@ nvox scan photo.png --flag-format 'ctf{}'
 
 ## Status
 
-Early development. **M0 (bootstrap)**, **M1 (core engine)** and **M2 (flag
-engine)** are complete, and **M3 (deep image analysis)** is implemented:
+Early development. **M0 (bootstrap)**, **M1 (core engine)**, **M2 (flag
+engine)** and **M3 (deep image analysis)** are complete:
 configuration, `nvox doctor`, evidence ingestion, the artifact store, plugin
 discovery, the scheduler/hook engine, `nvox scan`, `nvox plugins` and
 `nvox extract`. The built-in decoder chain covers base encodings, common
@@ -63,9 +63,23 @@ To try optional image dependencies:
 uv sync --group dev --extra image
 ```
 
+To install all optional external tools at once:
+
+```bash
+# NixOS / Nix
+nix-shell
+
+# Arch Linux (uses yay/paru for AUR packages when available)
+./scripts/install-arch-tools.sh
+```
+
+See [docs/tooling.md](docs/tooling.md) for details and unavailable tools.
+
 ## Usage
 
 ```bash
+nvox scan photo.png                              # artifact-only scan, no flag search
+nvox scan photo.png --csv --out out/             # artifact CSV for spreadsheets
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./dump --flag 'flag\{[^}]+\}' -i --depth 4
 nvox scan challenge.bin --flag-format 'htb{}' --json --out out/
@@ -80,13 +94,16 @@ nvox --version
 
 Flag formats are user supplied: `{}` is the only placeholder and the braces are
 part of the flag syntax, so `ctf{}`, `htb{}` and `pico{}` match `ctf{...}`,
-`htb{...}` and `pico{...}`. `scan` writes `out/findings.json` and exits with
-code `2` when at least one flag is found; add `--json` for stdout-only JSON.
+`htb{...}` and `pico{...}`. Without a format or `--flag`, `scan` runs the
+artifact pipeline without flag search and writes all artifact metadata to
+`out/findings.json`; `--csv` additionally writes `out/artifacts.csv`. With a
+format, it exits with code `2` when at least one flag is found; `--json` emits
+stdout-only JSON.
 
 See [docs/cli.md](docs/cli.md) for the full interface,
-[docs/plugins.md](docs/plugins.md) for writing plugins and
+[docs/plugins.md](docs/plugins.md) for writing plugins,
 [docs/image-analysis.md](docs/image-analysis.md) for the M3 technique coverage
-and limitations.
+and limitations, and [docs/tooling.md](docs/tooling.md) for optional tools.
 
 ## Documentation
 

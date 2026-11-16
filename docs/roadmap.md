@@ -63,7 +63,7 @@ Scope note: full metadata (XMP/IPTC/ICC/PNG chunks/JPEG segments), bit planes
 1-8 and arbitrary bit orders remain M3. Chunked/streaming raw scans and
 overlapping windows remain M5/M7 performance work; M2 artifacts are in memory.
 
-## M3 — Deep image analysis (implementation complete)
+## M3 — Deep image analysis (done)
 
 - [x] EXIF/XMP/IPTC/ICC; PNG chunks (`tEXt`, `zTXt`, `iTXt`, CRC, extra chunks)
 - [x] JPEG segments (`APPn`, `COM`), GIF extensions, BMP/TIFF basics
@@ -97,6 +97,8 @@ report opens offline.
       binwalk, foremost, StegSolve, zbar, tesseract
 - [ ] Harden declarative TOML command plugins (basic runner landed in M1)
 - [ ] `doctor` integration and graceful skips when tools are missing
+- [x] `shell.nix` and Arch installer script with available optional tools
+      (delivered early; `jphide`, `jpseek` and `stegdetect` remain unpackaged)
 - [ ] `flake.nix` devshell with all optional tools
 
 Acceptance: with tools installed everything runs; without them every bridge is

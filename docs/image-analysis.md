@@ -1,6 +1,6 @@
 # Image analysis
 
-> **Status:** M3 implementation. The built-in image pack parses PNG, JPEG, GIF,
+> **Status:** M3 complete. The built-in image pack parses PNG, JPEG, GIF,
 > BMP and TIFF metadata and structure, extracts configurable PNG bit planes,
 > detects channel/palette anomalies, carves embedded containers, and decodes raw
 > deflate streams. Optional QR/barcode and OCR bridges are not part of M3.
@@ -108,7 +108,7 @@ Run only the M3 suite:
 .venv/bin/pytest -q tests/test_image_deep.py
 ```
 
-The full suite covers 199 tests after M3.
+The full suite covers 201 tests after M3 and the pre-M4 tooling pass.
 
 ## Performance
 

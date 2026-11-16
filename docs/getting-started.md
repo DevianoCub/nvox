@@ -93,34 +93,39 @@ wins.
 
 ## Optional external tools
 
-External tools are never required. Install them system-wide or use a Nix shell
-on NixOS:
+External tools are never required. The repository includes install helpers:
 
 ```bash
-nix shell nixpkgs#exiftool nixpkgs#binwalk nixpkgs#steghide \
-           nixpkgs#zsteg nixpkgs#pngcheck nixpkgs#imagemagick \
-           nixpkgs#ffmpeg nixpkgs#sox nixpkgs#tesseract nixpkgs#zbar
+# NixOS / Nix: all tools available in nixpkgs
+nix-shell
+
+# Arch Linux: official packages plus AUR via yay/paru
+./scripts/install-arch-tools.sh
 ```
 
 Then re-run `nvox doctor` to confirm detection. Note that `zsteg` also requires
-Ruby, and StegSolve is a Java jar rather than a standalone binary.
+Ruby, StegSolve is a Java jar, and `jphide`, `jpseek` and `stegdetect` are not
+packaged in nixpkgs or Arch. See [Tooling setup](tooling.md).
 
 Do not want a tool used even when installed? Add it to `[tools].disable`.
 
 ## What's next
 
-M3 is implemented: `nvox scan` compiles user formats, walks the artifact graph,
-analyses PNG/JPEG/GIF/BMP/TIFF structure and metadata, extracts configurable PNG
-bit planes, runs the built-in decoders and reports findings with provenance. A
-first run:
+M3 is complete: `nvox scan` walks the artifact graph, analyses PNG/JPEG/GIF/BMP/
+TIFF structure and metadata, extracts configurable PNG bit planes, runs the
+built-in decoders and reports findings with provenance. With no flag format it
+runs artifact-only mode and writes the full report to JSON/CSV. A first run:
 
 ```bash
+nvox scan photo.png                              # artifact-only, JSON report
+nvox scan photo.png --csv --out out/             # plus artifacts.csv
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./evidence --flag-format 'htb{}' --flag 'FLAG\{[^}]+\}' -i --json
 ```
 
-Findings are written to `out/findings.json`; the command exits with code `2`
-when it finds a flag. `nvox extract <sha256>` reproduces any artifact from the
-store. Image technique coverage is in [Image analysis](image-analysis.md);
-external bridges, audio and the HTML/TUI reports arrive in M4-M7. See the
-[roadmap](roadmap.md) for the order of work.
+The report is written to `out/findings.json`; with a flag format the command
+exits with code `2` when it finds a flag. `nvox extract <sha256>` reproduces any
+artifact from the store. Image technique coverage is in
+[Image analysis](image-analysis.md); optional tool setup is in
+[Tooling setup](tooling.md). External bridges, audio, and the HTML/TUI reports
+arrive in M4-M7. See the [roadmap](roadmap.md) for the order of work.

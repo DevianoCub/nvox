@@ -21,14 +21,22 @@ Global options:
 ## `nvox scan`
 
 Scans a file or a directory recursively and writes a machine-readable report.
+Flag search is optional: without a format or raw pattern, Nvox runs the artifact
+pipeline and writes all artifact metadata to JSON/CSV without searching for flags.
 
 ```bash
-nvox scan <path> --flag-format 'ctf{}' [options]
+nvox scan <path> [--flag-format 'ctf{}' | --flag REGEX] [options]
 ```
 
 Examples:
 
 ```bash
+# Artifact-only scan: no flag search, full report on disk
+nvox scan photo.png --out out/
+
+# Also write a spreadsheet-friendly artifact CSV
+nvox scan photo.png --csv --out out/
+
 # One file, one format
 nvox scan photo.png --flag-format 'ctf{}'
 
@@ -57,9 +65,14 @@ nvox scan dump.bin --flag-format 'ctf{}' --no-xor-brute --no-external
 | `--plugins NAME,...` | Restrict the run to selected plugin names |
 | `--no-external` | Disable command plugins and plugins with external `requires` |
 | `--no-xor-brute` | Disable single-byte XOR brute force |
-| `--out`, `-o DIR` | Output directory for artifacts and `findings.json` (default `out/`) |
+| `--out`, `-o DIR` | Output directory for artifacts, `findings.json` and optional CSV (default `out/`) |
 | `--json` | Print the complete report as JSON on stdout |
+| `--csv` | Write `out/artifacts.csv`, one row per artifact |
 | `--verbose`, `-v` | Show plugin skips and their reasons |
+
+In artifact-only mode the terminal shows only a summary and the report paths;
+the artifact list stays in `findings.json` (and `artifacts.csv` with `--csv`).
+This avoids dumping thousands of metadata values into a terminal.
 
 Input may be a single file or a directory. Directory scans are recursive; the
 output directory is excluded from traversal, so `nvox scan . --out out` does not
@@ -70,9 +83,9 @@ Exit codes are meaningful for automation:
 
 | Code | Meaning |
 |---|---|
-| `0` | Scan completed and found no flags |
+| `0` | Scan completed and found no flags, or artifact-only mode completed |
 | `1` | Nvox configuration, format, option or I/O error |
-| `2` | Scan completed and found at least one flag |
+| `2` | Flag search completed and found at least one flag |
 
 Typer/Click itself also exits with `2` for malformed command-line usage (for
 example an unknown option). Nvox validation errors raised after parsing use
@@ -86,15 +99,17 @@ out/
   artifacts/<xx>/<sha256>   # evidence, decoded layers and bitstreams
   index.jsonl               # append-only artifact metadata log
   findings.json             # run summary, evidence records and findings
+  artifacts.csv             # optional, with --csv
 ```
 
-`findings.json` contains the effective formats/options, one entry per input
+`findings.json` contains the effective mode/formats/options, one entry per input
 (hashes, MIME type, artifacts and skips), the deduplicated findings with
 provenance chains, and a summary:
 
 ```json
 {
   "nvox": "0.1.0.dev0",
+  "mode": "flags",
   "formats": ["ctf{}"],
   "summary": {"files": 1, "artifacts": 42, "findings": 1, "skips": 7},
   "findings": [
@@ -109,8 +124,9 @@ provenance chains, and a summary:
 }
 ```
 
-Without `--json`, the command prints a Rich table of findings plus a summary
-line and the report path. With `--json`, stdout contains only the JSON report;
+With a flag format and without `--json`, the command prints a Rich table of
+findings plus a summary line and the report path. In artifact-only mode it prints
+only the summary and paths. With `--json`, stdout contains only the JSON report;
 warnings go to stderr.
 
 ## `nvox doctor`
