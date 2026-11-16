@@ -1,8 +1,8 @@
 # CLI reference
 
-> **Status:** `scan`, `doctor`, `plugins list|info|dirs`, `extract` and
-> `--version` are implemented. `report` and the `--format`/`--tui` options are
-> M4 work and are not available yet.
+> **Status:** `scan`, `doctor`, `plugins list|info|dirs`, `extract`, `report`,
+> `tui` and `--version` are implemented. `scan` writes `report.html` by default;
+> `report` re-renders a saved run and `tui` opens the Textual interface.
 
 ## Synopsis
 
@@ -37,6 +37,9 @@ nvox scan photo.png --out out/
 # Also write a spreadsheet-friendly artifact CSV
 nvox scan photo.png --csv --out out/
 
+# Skip the HTML report (it is written by default)
+nvox scan photo.png --no-html --out out/
+
 # One file, one format
 nvox scan photo.png --flag-format 'ctf{}'
 
@@ -68,6 +71,7 @@ nvox scan dump.bin --flag-format 'ctf{}' --no-xor-brute --no-external
 | `--out`, `-o DIR` | Output directory for artifacts, `findings.json` and optional CSV (default `out/`) |
 | `--json` | Print the complete report as JSON on stdout |
 | `--csv` | Write `out/artifacts.csv`, one row per artifact |
+| `--html/--no-html` | Write the self-contained `out/report.html` (default: on) |
 | `--verbose`, `-v` | Show plugin skips and their reasons |
 
 In artifact-only mode the terminal shows only a summary and the report paths;
@@ -99,6 +103,7 @@ out/
   artifacts/<xx>/<sha256>   # evidence, decoded layers and bitstreams
   index.jsonl               # append-only artifact metadata log
   findings.json             # run summary, evidence records and findings
+  report.html               # self-contained HTML report
   artifacts.csv             # optional, with --csv
 ```
 
@@ -124,10 +129,12 @@ provenance chains, and a summary:
 }
 ```
 
-With a flag format and without `--json`, the command prints a Rich table of
-findings plus a summary line and the report path. In artifact-only mode it prints
-only the summary and paths. With `--json`, stdout contains only the JSON report;
-warnings go to stderr.
+Interactive scans show a transient Rich progress line with the current file and
+live artifact/plugin/finding/skip counters. With a flag format and without
+`--json`, findings are grouped by surface and provenance chain, followed by a
+summary and the report paths. In artifact-only mode it prints only the summary
+and paths. With `--json`, stdout contains only the JSON report and progress is
+disabled; warnings go to stderr.
 
 ## `nvox doctor`
 
@@ -208,13 +215,43 @@ ambiguous prefix or an existing output file exits with code `1` instead of
 silently producing bad evidence. Without `--out`, the command prints the
 on-disk path and hash.
 
-## `nvox report` (planned, M4)
+## `nvox report`
 
 ```
-nvox report out/ --format html --open
+nvox report [SOURCE] [--out FILE] [--open] [--max-preview-bytes N]
 ```
 
-Re-renders reports from a previous run's `findings.json` without rescanning.
+Re-renders an existing run as a self-contained HTML report without rescanning.
+`SOURCE` may be a scan output directory (default `out/`) or a `findings.json`
+file. The default target is `report.html` next to the findings file.
+
+```bash
+nvox report out/
+nvox report out/findings.json --out /tmp/triage.html
+nvox report out/ --open
+```
+
+The report embeds CSS, JavaScript, text previews and small image/audio payloads.
+`--max-preview-bytes` changes the payload embedding limit (default 2 MiB);
+larger payloads are described instead of embedded. See
+[HTML reports and TUI](report.md) for the report layout.
+
+## `nvox tui`
+
+```
+nvox tui [PATH] [--report SOURCE] [--out DIR]
+```
+
+Opens the Textual artifact browser. With `PATH`, the TUI scans the target; with
+`--report`, it loads an existing run without rescanning; with neither, enter a
+path in the interface. The TUI provides an artifact tree, payload preview,
+findings table and per-plugin checkboxes.
+
+Textual is optional:
+
+```bash
+uv sync --extra tui
+```
 
 ## Environment variables
 

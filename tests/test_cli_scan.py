@@ -32,6 +32,9 @@ def test_scan_finds_flag_and_writes_report(monkeypatch, tmp_path: Path) -> None:
     assert report["summary"]["findings"] == 1
     assert report["findings"][0]["value"] == "cli_scan_ok"
     assert report["evidence"][0]["path"].endswith("note.txt")
+    html = (out / "report.html").read_text(encoding="utf-8")
+    assert "cli_scan_ok" in html
+    assert "Artifact tree" in html
 
 
 def test_scan_json_mode_and_clean_exit(monkeypatch, tmp_path: Path) -> None:
@@ -156,6 +159,16 @@ def test_scan_without_flags_is_artifact_only(monkeypatch, tmp_path: Path) -> Non
     assert rows[0]["evidence_path"].endswith("note.txt")
     assert "artifact_sha256" in rows[0]
     assert "producer" in rows[0]
+
+
+def test_scan_can_disable_html(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    evidence = tmp_path / "note.txt"
+    evidence.write_bytes(b"ctf{no_html}")
+    out = tmp_path / "out"
+    result = _invoke(str(evidence), "--flag-format", "ctf{}", "--out", str(out), "--no-html")
+    assert result.exit_code == 2, result.output
+    assert not (out / "report.html").exists()
 
 
 def test_scan_without_flags_json_mode(monkeypatch, tmp_path: Path) -> None:

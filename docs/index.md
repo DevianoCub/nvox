@@ -37,19 +37,21 @@ Nvox is under active development.
 | M1 | Core engine: artifacts, registry, scheduler, hooks | done |
 | M2 | Flag engine: formats, decoders, XOR brute, provenance | done |
 | M3 | Deep image analysis and steganography | done |
-| M4 | CLI polish, HTML report, TUI | next |
-| M5 | External tool bridges, declarative plugin hardening | planned |
+| M4 | CLI polish, HTML report, TUI | done |
+| M5 | External tool bridges, declarative plugin hardening | next |
 | M6 | Audio and generic file analysis | planned |
 | M7 | Hardening, docs, 0.1 release | planned |
 
 Working commands today: `nvox scan`, `nvox doctor`,
-`nvox plugins list|info|dirs` and `nvox extract`. M3 adds deep PNG/JPEG/GIF/BMP/
-TIFF metadata, configurable PNG bit planes, palette/alpha/channel analysis,
-trailing/prepended and polyglot detection, embedded-container carving and raw
-DEFLATE decoding. `nvox scan` also runs without a flag format: it writes the
-complete artifact report to JSON/CSV instead of printing everything in the
-terminal. Everything documented as "planned" describes the target design and is
-not implemented yet; each page marks its status explicitly.
+`nvox plugins list|info|dirs`, `nvox extract`, `nvox report` and `nvox tui`.
+M3 adds deep PNG/JPEG/GIF/BMP/TIFF metadata, configurable PNG bit planes,
+palette/alpha/channel analysis, trailing/prepended and polyglot detection,
+embedded-container carving and raw DEFLATE decoding. `nvox scan` also runs
+without a flag format: it writes the complete artifact report to JSON/CSV and
+HTML instead of printing everything in the terminal. M4 adds live progress,
+grouped findings, a self-contained HTML report and a Textual triage interface.
+Everything documented as "planned" describes the target design and is not
+implemented yet; each page marks its status explicitly.
 
 ## Documentation
 
@@ -58,6 +60,7 @@ not implemented yet; each page marks its status explicitly.
 - [CLI reference](cli.md)
 - [Plugins](plugins.md)
 - [Image analysis](image-analysis.md)
+- [HTML reports and TUI](report.md)
 - [Flag engine](flag-engine.md)
 - [Tooling setup](tooling.md)
 - [Forensics and evidence handling](forensics.md)

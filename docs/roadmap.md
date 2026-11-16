@@ -78,16 +78,17 @@ Acceptance: one fixture per technique in `tests/test_image_deep.py`; a 12 MP
 PNG completes in 48.7 s against the default 120 s budget; the coverage table
 and limitations are in [Image analysis](image-analysis.md).
 
-## M4 — UX
+## M4 — UX (done)
 
-- [ ] Rich scan output with live progress and grouped findings
-- [ ] Self-contained HTML report: artifact tree, previews, findings, provenance
+- [x] Rich scan output with live progress and grouped findings
+- [x] Self-contained HTML report: artifact tree, previews, findings, provenance
       graph, filters
-- [ ] Textual TUI: artifact tree, artifact preview, findings, plugin toggles
-- [ ] `nvox report` re-render without rescanning
+- [x] Textual TUI: artifact tree, artifact preview, findings, plugin toggles
+- [x] `nvox report` re-render without rescanning
 
 Acceptance: a real sample is triaged end-to-end from the terminal, and the HTML
-report opens offline.
+report opens offline. The report and terminal workflow are documented in
+[HTML reports and TUI](report.md).
 
 ## M5 — Bridges and declarative plugins
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json as jsonlib
+from collections import defaultdict
 from dataclasses import replace
 from datetime import UTC, datetime
 from importlib.metadata import entry_points
@@ -15,6 +16,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
+from rich.tree import Tree
 
 from nvox import __version__
 from nvox.api import Plugin
@@ -30,6 +32,14 @@ from nvox.core.registry import (
     is_external,
 )
 from nvox.core.store import ArtifactStore, ArtifactStoreError
+from nvox.progress import ScanProgress
+from nvox.report import (
+    DEFAULT_MAX_PREVIEW_BYTES,
+    ReportError,
+    default_html_path,
+    load_report,
+    write_html_report,
+)
 
 console = Console()
 
@@ -315,6 +325,13 @@ def scan(
             help="Write out/artifacts.csv with one row per artifact.",
         ),
     ] = False,
+    html_output: Annotated[
+        bool,
+        typer.Option(
+            "--html/--no-html",
+            help="Write a self-contained out/report.html after the scan.",
+        ),
+    ] = True,
     verbose: Annotated[
         bool,
         typer.Option("--verbose", "-v", help="Show skips and per-plugin failures."),
@@ -361,17 +378,26 @@ def scan(
         _fail(str(exc))
 
     files = _collect_inputs(path, out_dir)
-    engine = Engine(
-        config,
-        registry=registry,
-        store=store,
-        flag_scanner=scanner,
-        jobs=config.limits.effective_jobs(),
-    )
-
     results: list[tuple[Path, ScanResult]] = []
-    for evidence_path in files:
-        results.append((evidence_path, engine.analyze(evidence_path)))
+    progress = ScanProgress(
+        console,
+        total_files=len(files),
+        enabled=not json_output and console.is_terminal,
+    )
+    with progress:
+        engine = Engine(
+            config,
+            registry=registry,
+            store=store,
+            flag_scanner=scanner,
+            jobs=config.limits.effective_jobs(),
+            on_event=progress.on_event,
+        )
+        for evidence_path in files:
+            progress.start_file(evidence_path)
+            result = engine.analyze(evidence_path)
+            progress.finish_file(result)
+            results.append((evidence_path, result))
 
     findings = _aggregate_findings(results)
     report = _build_report(
@@ -401,6 +427,18 @@ def scan(
         except OSError as exc:
             _fail(f"cannot write {csv_path}: {exc}")
 
+    html_path = out_dir / "report.html" if html_output else None
+    if html_path is not None:
+        try:
+            write_html_report(
+                report,
+                html_path,
+                store_root=out_dir,
+                title=f"Nvox scan report — {path}",
+            )
+        except ReportError as exc:
+            _fail(str(exc))
+
     if json_output:
         typer.echo(jsonlib.dumps(report, indent=2, ensure_ascii=False))
     else:
@@ -413,9 +451,94 @@ def scan(
             target=path,
             flag_search=flag_search,
             csv_path=csv_path,
+            html_path=html_path,
         )
     if findings:
         raise typer.Exit(code=2)
+
+
+@app.command()
+def report(
+    source: Annotated[
+        Path,
+        typer.Argument(help="findings.json or a scan output directory."),
+    ] = Path("out"),
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            "--out",
+            "-o",
+            help="HTML output path (default: report.html next to findings).",
+        ),
+    ] = None,
+    open_browser: Annotated[
+        bool,
+        typer.Option("--open", help="Open the generated report in the default browser."),
+    ] = False,
+    max_preview_bytes: Annotated[
+        int,
+        typer.Option(
+            "--max-preview-bytes",
+            help="Largest image/audio payload embedded in the HTML report.",
+        ),
+    ] = DEFAULT_MAX_PREVIEW_BYTES,
+) -> None:
+    """Re-render a saved scan as a standalone HTML report without rescanning."""
+    if max_preview_bytes < 1:
+        _fail("--max-preview-bytes must be greater than zero")
+    try:
+        report_data, report_path = load_report(source)
+    except ReportError as exc:
+        _fail(str(exc))
+    target = out.expanduser() if out is not None else default_html_path(source)
+    try:
+        path = write_html_report(
+            report_data,
+            target,
+            store_root=report_path.parent,
+            title=f"Nvox report — {report_path.parent.name}",
+            max_preview_bytes=max_preview_bytes,
+        )
+    except ReportError as exc:
+        _fail(str(exc))
+    console.print(f"[green]wrote[/] {escape(str(path))}")
+    if open_browser:
+        import webbrowser
+
+        webbrowser.open(path.resolve().as_uri())
+
+
+@app.command()
+def tui(
+    ctx: typer.Context,
+    source: Annotated[
+        Path | None,
+        typer.Argument(help="Evidence file/directory to scan, or omit with --report."),
+    ] = None,
+    report_source: Annotated[
+        Path | None,
+        typer.Option("--report", help="Load an existing findings.json or output directory."),
+    ] = None,
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Artifact output directory for new scans."),
+    ] = Path("out"),
+) -> None:
+    """Open the interactive Textual triage interface."""
+    if source is not None and report_source is not None:
+        _fail("provide either an evidence path or --report, not both")
+    config = _load_config(ctx)
+    try:
+        from nvox.tui import NvoxTui
+    except ImportError as exc:
+        _fail(f"Textual is not installed; install the tui extra: {exc}")
+    app_instance = NvoxTui(
+        path=source,
+        report_source=report_source,
+        out=out.expanduser(),
+        config=config,
+    )
+    app_instance.run()
 
 
 @app.command()
@@ -652,6 +775,7 @@ def _render_scan(
     target: Path,
     flag_search: bool,
     csv_path: Path | None,
+    html_path: Path | None,
 ) -> None:
     console.print(f"[bold]Nvox scan[/] {escape(str(target))}")
     if not flag_search:
@@ -660,25 +784,7 @@ def _render_scan(
             "full artifact data is written to the report."
         )
     elif findings:
-        table = Table(title="Findings", title_justify="left")
-        table.add_column("Flag", style="bold", overflow="fold")
-        table.add_column("Conf", no_wrap=True)
-        table.add_column("Surface", no_wrap=True)
-        table.add_column("Offset", justify="right", no_wrap=True)
-        table.add_column("Evidence", overflow="fold")
-        table.add_column("Chain", overflow="fold")
-        styles = {"high": "green", "medium": "yellow", "low": "dim"}
-        for finding in findings:
-            chain = " -> ".join(step.plugin for step in finding.chain) or "evidence"
-            table.add_row(
-                escape(finding.value),
-                f"[{styles.get(finding.confidence, 'white')}]{finding.confidence}[/]",
-                finding.surface,
-                f"0x{finding.offset:x}",
-                escape(finding.evidence_path),
-                escape(chain),
-            )
-        console.print(table)
+        console.print(_findings_tree(findings))
     else:
         console.print("[green]No flags found.[/]")
 
@@ -708,6 +814,39 @@ def _render_scan(
     console.print(f"[dim]report: {escape(str(report_path))}[/]")
     if csv_path is not None:
         console.print(f"[dim]artifacts CSV: {escape(str(csv_path))}[/]")
+    if html_path is not None:
+        console.print(f"[dim]HTML report: {escape(str(html_path))}[/]")
+
+
+def _findings_tree(findings: list[Finding]) -> Tree:
+    """Group findings by surface and provenance chain for terminal triage."""
+    grouped: dict[str, dict[str, list[Finding]]] = defaultdict(lambda: defaultdict(list))
+    for finding in findings:
+        chain = " -> ".join(step.plugin for step in finding.chain) or "evidence"
+        grouped[finding.surface][chain].append(finding)
+    styles = {"high": "green", "medium": "yellow", "low": "dim"}
+    tree = Tree(f"[bold]Findings ({len(findings)})[/]")
+    for surface in sorted(grouped):
+        chains = grouped[surface]
+        count = sum(len(items) for items in chains.values())
+        surface_node = tree.add(f"[bold cyan]{escape(surface)}[/] [dim]({count})[/]")
+        for chain in sorted(chains):
+            chain_node = surface_node.add(f"[dim]{escape(chain)}[/]")
+            for finding in sorted(
+                chains[chain],
+                key=lambda item: (
+                    {"high": 0, "medium": 1, "low": 2}.get(item.confidence, 3),
+                    item.offset,
+                    item.value,
+                ),
+            ):
+                style = styles.get(finding.confidence, "white")
+                chain_node.add(
+                    f"[bold]{escape(finding.value)}[/] "
+                    f"[{style}]{finding.confidence}[/] "
+                    f"[dim]offset 0x{finding.offset:x} · {escape(finding.evidence_path)}[/]"
+                )
+    return tree
 
 
 def _all_skips(results: list[tuple[Path, ScanResult]]) -> list[Skip]:

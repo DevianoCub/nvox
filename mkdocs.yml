@@ -22,6 +22,7 @@ nav:
   - Plugins: plugins.md
   - Flag engine: flag-engine.md
   - Image analysis: image-analysis.md
+  - HTML reports and TUI: report.md
   - Tooling setup: tooling.md
   - Forensics: forensics.md
   - Development: development.md
