@@ -13,13 +13,15 @@ nvox scan photo.png --flag-format 'ctf{}'
 ## Status
 
 Early development. **M0 (bootstrap)**, **M1 (core engine)** and **M2 (flag
-engine)** are complete: configuration, `nvox doctor`, evidence ingestion, the
-artifact store, plugin discovery, the scheduler/hook engine, `nvox scan`,
-`nvox plugins` and `nvox extract`. The built-in decoder chain covers base
-encodings, common compression and XOR brute force; the image pack currently
-provides minimal EXIF strings and PNG LSB extraction. Deep image analysis,
-external bridges, audio and the HTML/TUI reports land in M3-M7; see the
-[roadmap](docs/roadmap.md).
+engine)** are complete, and **M3 (deep image analysis)** is implemented:
+configuration, `nvox doctor`, evidence ingestion, the artifact store, plugin
+discovery, the scheduler/hook engine, `nvox scan`, `nvox plugins` and
+`nvox extract`. The built-in decoder chain covers base encodings, common
+compression and XOR brute force. The image pack parses PNG/JPEG/GIF/BMP/TIFF
+metadata and structure, extracts configurable PNG bit planes, analyses
+palette/alpha/channel anomalies, carves embedded containers and decodes raw
+DEFLATE. External bridges, audio, the HTML report and the TUI land in M4-M7; see
+the [roadmap](docs/roadmap.md) and [image analysis coverage](docs/image-analysis.md).
 
 ## Why it is modular
 
@@ -81,8 +83,10 @@ part of the flag syntax, so `ctf{}`, `htb{}` and `pico{}` match `ctf{...}`,
 `htb{...}` and `pico{...}`. `scan` writes `out/findings.json` and exits with
 code `2` when at least one flag is found; add `--json` for stdout-only JSON.
 
-See [docs/cli.md](docs/cli.md) for the full interface and
-[docs/plugins.md](docs/plugins.md) for writing plugins.
+See [docs/cli.md](docs/cli.md) for the full interface,
+[docs/plugins.md](docs/plugins.md) for writing plugins and
+[docs/image-analysis.md](docs/image-analysis.md) for the M3 technique coverage
+and limitations.
 
 ## Documentation
 
@@ -97,8 +101,8 @@ intentionally empty for now.
 | M0 | Bootstrap, config, `doctor` (done) |
 | M1 | Core engine: artifacts, registry, scheduler, hooks (done) |
 | M2 | Flag engine: formats, decoders, XOR brute, provenance (done) |
-| M3 | Deep image analysis and steganography (next) |
-| M4 | CLI polish, HTML report, TUI |
+| M3 | Deep image analysis and steganography (implemented) |
+| M4 | CLI polish, HTML report, TUI (next) |
 | M5 | External tool bridges, declarative plugin hardening |
 | M6 | Audio and generic file analysis |
 | M7 | Hardening, docs, 0.1 release |

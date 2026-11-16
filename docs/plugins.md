@@ -1,10 +1,10 @@
 # Plugins
 
-> **Status:** implemented through M2. The stable import surface is `nvox.api`
-> (`API_VERSION = 1`). The built-in image pack currently covers EXIF strings and
-> PNG LSB; deep image analysis arrives in M3, audio in M6. Command plugins gain
-> hard sandboxing in M5 and optional process isolation for Python plugins is
-> planned for M7.
+> **Status:** implemented through M3. The stable import surface is `nvox.api`
+> (`API_VERSION = 1`). The built-in image pack covers PNG/JPEG/GIF/BMP/TIFF
+> metadata and structure, configurable bit planes, channel analysis, carving and
+> DEFLATE; audio arrives in M6. Command plugins gain hard sandboxing in M5 and
+> optional process isolation for Python plugins is planned for M7.
 
 Everything that analyses, extracts or decodes is a plugin. The core provides
 evidence handling, the artifact store, scheduling, flag scanning and reporting;
@@ -26,9 +26,12 @@ scanner searches them with full provenance.
 
 | Pack | Plugins | Milestone |
 |---|---|---|
-| `generic` | `generic.strings` (ASCII + UTF-16LE/BE runs) | M1 |
-| `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `xor` | M2 |
-| `image` | `image.exif` (JPEG/TIFF strings), `image.lsb` (8-bit PNG channel LSB) | M2 (minimal) |
+| `generic` | `generic.strings` (ASCII + UTF-16LE/BE runs), `generic.carve` (embedded containers) | M1-M3 |
+| `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `deflate`, `xor` | M2-M3 |
+| `image` | `image.structure`, `image.png_chunks`, `image.jpeg`, `image.exif`, `image.gif`, `image.bmp`, `image.tiff`, `image.channels`, `image.lsb` | M2-M3 |
+
+The image pack is documented in detail, with options and limitations, in
+[Image analysis](image-analysis.md).
 
 The decoder pack is intentionally conservative: base encodings must validate
 and produce meaningful text/magic, compression is magic-gated, and XOR keeps
@@ -233,6 +236,7 @@ loaded with a warning.
 ## Reference implementation
 
 `src/nvox/plugins/generic/strings.py` is the reference plugin for options,
-MIME targets, `accepts` narrowing and `ctx.skip`. The image and decoder packs
-show metadata and transform plugins. A copy-paste template and a conformance
-test harness are part of M7.
+MIME targets, `accepts` narrowing and `ctx.skip`. The image pack shows structural
+metadata analyzers (`image.png_chunks`, `image.jpeg`), bounded extraction and
+bit-plane emission; the decoder pack shows transform/gating patterns. A
+copy-paste template and a conformance test harness are part of M7.

@@ -35,18 +35,18 @@ Nvox is under active development.
 | M0 | Bootstrap, configuration, `nvox doctor` | done |
 | M1 | Core engine: artifacts, registry, scheduler, hooks | done |
 | M2 | Flag engine: formats, decoders, XOR brute, provenance | done |
-| M3 | Deep image analysis and steganography | next |
-| M4 | CLI polish, HTML report, TUI | planned |
+| M3 | Deep image analysis and steganography | implemented |
+| M4 | CLI polish, HTML report, TUI | next |
 | M5 | External tool bridges, declarative plugin hardening | planned |
 | M6 | Audio and generic file analysis | planned |
 | M7 | Hardening, docs, 0.1 release | planned |
 
 Working commands today: `nvox scan`, `nvox doctor`,
-`nvox plugins list|info|dirs` and `nvox extract`. M2 includes raw/text/metadata/
-bitstream surfaces, the built-in decoder chain, minimal EXIF and PNG LSB
-plugins, and JSON findings with provenance. Everything documented as "planned"
-describes the target design and is not implemented yet; each page marks its
-status explicitly.
+`nvox plugins list|info|dirs` and `nvox extract`. M3 adds deep PNG/JPEG/GIF/BMP/
+TIFF metadata, configurable PNG bit planes, palette/alpha/channel analysis,
+trailing/prepended and polyglot detection, embedded-container carving and raw
+DEFLATE decoding. Everything documented as "planned" describes the target
+design and is not implemented yet; each page marks its status explicitly.
 
 ## Documentation
 
@@ -54,6 +54,7 @@ status explicitly.
 - [Architecture](architecture.md)
 - [CLI reference](cli.md)
 - [Plugins](plugins.md)
+- [Image analysis](image-analysis.md)
 - [Flag engine](flag-engine.md)
 - [Forensics and evidence handling](forensics.md)
 - [Development](development.md)

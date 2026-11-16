@@ -1,8 +1,8 @@
 # Flag engine
 
-> **Status:** implemented in M2 for raw/text/metadata/bitstream surfaces and the
-> built-in decoder chain. Deep image metadata (XMP, IPTC, ICC), full bit-plane
-> coverage and HTML/TUI reporting remain M3/M4.
+> **Status:** implemented through M3 for raw/text/metadata/bitstream surfaces
+> and the built-in decoder chain. M3 adds XMP/IPTC/ICC, PNG/JPEG/GIF/BMP/TIFF
+> structure and configurable PNG bit planes. HTML/TUI reporting remains M4.
 
 The flag engine takes user-defined formats and searches every surface Nvox can
 produce. It is the reason the artifact graph exists: a flag only visible after
@@ -45,26 +45,28 @@ label in every finding. Overlapping matches are deduplicated by value.
 
 ## Surfaces
 
-| Surface | M2 implementation |
+| Surface | Current implementation |
 |---|---|
 | Raw bytes | The complete in-memory artifact payload |
 | Strings | ASCII and UTF-16LE/BE runs, with absolute byte offsets |
 | Text artifacts | Every `text` artifact produced by analyzers or decoders |
-| Metadata | JSON metadata artifacts and EXIF string values |
-| Bitstreams | Artifacts emitted by the PNG LSB plugin |
+| Metadata | JSON metadata artifacts plus EXIF, XMP, IPTC, ICC and chunk text |
+| Bitstreams | PNG bit planes and channel/palette analysis artifacts |
 | Decoded layers | Output of the decoder chain, recursively |
 
 The scanner searches both raw bytes and text runs. A match found by both is
-reported once, with the more structured surface. M3 expands metadata to
-XMP/IPTC/ICC, PNG chunks and all JPEG segments, and expands bit planes to bits
-1-8, both bit orders and row/column layouts.
+reported once, with the more structured surface. M3 metadata covers PNG chunks,
+JPEG `APPn`/`COM`, GIF extensions, BMP/TIFF headers and strings, plus XMP/IPTC/
+ICC text. Bitplane extraction supports bits 1-8, all channels, both bit orders
+and row/column layouts.
 
 ## Decoder chain
 
 Decoders are plugins under `src/nvox/plugins/decoders/`. Built-ins:
 
 `base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`,
-`reverse`, `gzip`, `zlib`, `bzip2`, `xz`, single-byte `xor` (brute force).
+`reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `deflate` (raw and embedded zlib),
+single-byte `xor` (brute force).
 
 They run as ordinary plugins, so every decoded layer is stored, hashed and fed
 back into the graph. The engine applies them breadth-first with:

@@ -63,19 +63,20 @@ Scope note: full metadata (XMP/IPTC/ICC/PNG chunks/JPEG segments), bit planes
 1-8 and arbitrary bit orders remain M3. Chunked/streaming raw scans and
 overlapping windows remain M5/M7 performance work; M2 artifacts are in memory.
 
-## M3 — Deep image analysis
+## M3 — Deep image analysis (implementation complete)
 
-- [ ] EXIF/XMP/IPTC/ICC; PNG chunks (`tEXt`, `zTXt`, `iTXt`, CRC, extra chunks)
-- [ ] JPEG segments (`APPn`, `COM`), GIF extensions, BMP/TIFF basics
-- [ ] Trailing/prepended data, polyglot detection
-- [ ] Bit planes 1-8 x channels x bit order x row/column major
-- [ ] Automatic zlib/deflate detection on bitstreams
-- [ ] Palette and alpha anomalies, channel filters, bit-plane images
-- [ ] Embedded file detection by magic bytes and carving
-- [ ] Optional: QR/barcode and OCR hooks
+- [x] EXIF/XMP/IPTC/ICC; PNG chunks (`tEXt`, `zTXt`, `iTXt`, CRC, extra chunks)
+- [x] JPEG segments (`APPn`, `COM`), GIF extensions, BMP/TIFF basics
+- [x] Trailing/prepended data, polyglot detection
+- [x] Bit planes 1-8 x channels x bit order x row/column major
+- [x] Automatic zlib/deflate detection on bitstreams
+- [x] Palette and alpha anomalies, channel filters, bit-plane images
+- [x] Embedded file detection by magic bytes and carving
+- [ ] Optional: QR/barcode and OCR hooks (deferred; extension points reserved)
 
-Acceptance: one fixture per technique; 12 MP PNG stays within the time budget;
-coverage table in the docs.
+Acceptance: one fixture per technique in `tests/test_image_deep.py`; a 12 MP
+PNG completes in 48.7 s against the default 120 s budget; the coverage table
+and limitations are in [Image analysis](image-analysis.md).
 
 ## M4 — UX
 

@@ -1,9 +1,10 @@
-"""Minimal EXIF/TIFF string extraction.
+"""Focused EXIF/TIFF string extraction.
 
-This is intentionally narrower than the M3 metadata milestone: it reads ASCII
-and UserComment values from JPEG APP1 and TIFF IFD0/Exif-IFD so the flag engine
-can search metadata and decode base64 hidden there. Richer EXIF/XMP/IPTC support
-lands in M3.
+Reads ASCII, XP, XMP, GPS and UserComment values from JPEG APP1 and TIFF IFD0,
+Exif, GPS, Interop and thumbnail IFDs so the flag engine can search metadata and
+decode payloads hidden there. Richer container coverage (IPTC/ICC, all JPEG/GIF/
+BMP/TIFF structures) lives in the M3 image plugins; this plugin deliberately
+keeps its concise provenance chain.
 """
 
 from __future__ import annotations
@@ -21,7 +22,18 @@ _ASCII_TAGS = {
     0x0132: "DateTime",
     0x013B: "Artist",
     0x8298: "Copyright",
+    0x9003: "DateTimeOriginal",
+    0x9004: "DateTimeDigitized",
     0x9286: "UserComment",
+    0x9290: "SubSecTime",
+    0x9291: "SubSecTimeOriginal",
+    0x9292: "SubSecTimeDigitized",
+    0xA420: "ImageUniqueID",
+    0xA430: "CameraOwnerName",
+    0xA431: "BodySerialNumber",
+    0xA433: "LensMake",
+    0xA434: "LensModel",
+    0xA435: "LensSerialNumber",
 }
 _XP_TAGS = {
     0x9C9B: "XPTitle",
@@ -30,8 +42,23 @@ _XP_TAGS = {
     0x9C9E: "XPKeywords",
     0x9C9F: "XPSubject",
 }
+_GPS_ASCII_TAGS = {
+    0x0001: "GPSLatitudeRef",
+    0x0003: "GPSLongitudeRef",
+    0x0009: "GPSStatus",
+    0x000A: "GPSMeasureMode",
+    0x001D: "GPSDateStamp",
+}
+_GPS_TEXT_TAGS = {
+    0x001B: "GPSProcessingMethod",
+    0x001C: "GPSAreaInformation",
+}
 _EXIF_IFD_POINTER = 0x8769
+_GPS_IFD_POINTER = 0x8825
+_INTEROP_IFD_POINTER = 0xA005
+_XMP_TAG = 0x02BC
 _MAX_ENTRIES = 1024
+_MAX_IFDS = 16
 Endian = Literal["little", "big"]
 
 
@@ -78,7 +105,7 @@ def jpeg_exif_block(payload: bytes) -> bytes | None:
 
 
 def parse_tiff_strings(tiff: bytes) -> dict[str, str]:
-    """Parse ASCII/UserComment/XP strings from TIFF IFD0 and the Exif IFD."""
+    """Parse string tags from IFD0, Exif, GPS, Interop and thumbnail IFDs."""
     if len(tiff) < 8:
         raise ExifError("truncated TIFF header")
     byte_order = tiff[:2]
@@ -93,11 +120,14 @@ def parse_tiff_strings(tiff: bytes) -> dict[str, str]:
         raise ExifError("invalid TIFF magic")
     first_ifd = _u32(tiff, 4, endian)
     values: dict[str, str] = {}
-    pending: list[int] = []
-    _read_ifd(tiff, first_ifd, endian, values, pending)
-    for offset in pending[:8]:
-        if offset and offset not in {first_ifd}:
-            _read_ifd(tiff, offset, endian, values, [])
+    pending: list[tuple[int, str]] = [(first_ifd, "ifd")]
+    seen: set[int] = set()
+    while pending and len(seen) < _MAX_IFDS:
+        offset, kind = pending.pop(0)
+        if offset < 8 or offset in seen:
+            continue
+        seen.add(offset)
+        _read_ifd(tiff, offset, endian, values, pending, kind)
     return values
 
 
@@ -106,9 +136,10 @@ def _read_ifd(
     offset: int,
     endian: Endian,
     values: dict[str, str],
-    pending: list[int],
+    pending: list[tuple[int, str]],
+    kind: str,
 ) -> None:
-    if offset < 8 or offset + 2 > len(tiff):
+    if offset + 2 > len(tiff):
         return
     count = _u16(tiff, offset, endian)
     if count > _MAX_ENTRIES:
@@ -121,15 +152,42 @@ def _read_ifd(
         value_type = _u16(tiff, entry + 2, endian)
         item_count = _u32(tiff, entry + 4, endian)
         value_field = entry + 8
-        if tag == _EXIF_IFD_POINTER and value_type in (4, 13) and item_count >= 1:
-            pending.append(_u32(tiff, value_field, endian))
+        if tag in {_EXIF_IFD_POINTER, _GPS_IFD_POINTER, _INTEROP_IFD_POINTER}:
+            if value_type in (4, 13) and item_count >= 1:
+                child_kind = {
+                    _EXIF_IFD_POINTER: "exif",
+                    _GPS_IFD_POINTER: "gps",
+                    _INTEROP_IFD_POINTER: "interop",
+                }[tag]
+                pending.append((_u32(tiff, value_field, endian), child_kind))
+            continue
+        if kind == "gps" and tag in _GPS_ASCII_TAGS and value_type == 2:
+            raw = _value_bytes(tiff, value_field, item_count, endian)
+            if raw is not None:
+                text = raw.split(b"\x00", 1)[0].decode("utf-8", errors="replace").strip()
+                if text:
+                    values.setdefault(_GPS_ASCII_TAGS[tag], text)
+            continue
+        if kind == "gps" and tag in _GPS_TEXT_TAGS and value_type == 7:
+            raw = _value_bytes(tiff, value_field, item_count, endian)
+            if raw is not None:
+                text = _decode_text(raw, tag, endian)
+                if text:
+                    values.setdefault(_GPS_TEXT_TAGS[tag], text)
             continue
         if tag in _XP_TAGS and value_type == 1:
             raw = _value_bytes(tiff, value_field, item_count, endian)
             if raw is not None:
                 text = raw.decode("utf-16-le", errors="replace").split("\x00", 1)[0].strip()
                 if text:
-                    values[_XP_TAGS[tag]] = text
+                    values.setdefault(_XP_TAGS[tag], text)
+            continue
+        if tag == _XMP_TAG and value_type in (1, 7):
+            raw = _value_bytes(tiff, value_field, item_count, endian)
+            if raw is not None:
+                text = raw.decode("utf-8", errors="replace").strip("\x00 \t\r\n")
+                if text:
+                    values.setdefault("XMP", text)
             continue
         if tag not in _ASCII_TAGS or value_type not in (2, 7):
             continue
@@ -138,7 +196,12 @@ def _read_ifd(
             continue
         text = _decode_text(raw, tag, endian)
         if text:
-            values[_ASCII_TAGS[tag]] = text
+            values.setdefault(_ASCII_TAGS[tag], text)
+    next_offset = offset + 2 + count * 12
+    if next_offset + 4 <= len(tiff):
+        next_ifd = _u32(tiff, next_offset, endian)
+        if next_ifd:
+            pending.append((next_ifd, "ifd"))
     return
 
 
@@ -154,7 +217,7 @@ def _value_bytes(tiff: bytes, value_field: int, count: int, endian: Endian) -> b
 
 
 def _decode_text(raw: bytes, tag: int, endian: Endian) -> str:
-    if tag == 0x9286:
+    if tag in {0x9286, 0x001B, 0x001C}:
         for prefix in (b"ASCII\x00\x00\x00", b"UNICODE\x00", b"JIS\x00\x00\x00\x00\x00"):
             if raw.startswith(prefix):
                 raw = raw[len(prefix) :]
@@ -182,11 +245,13 @@ def _u32(data: bytes, offset: int, endian: Endian) -> int:
 @register
 class ExifPlugin(Analyzer):
     name: ClassVar[str] = "image.exif"
-    version: ClassVar[str] = "0.1.0"
+    version: ClassVar[str] = "0.2.0"
     kind: ClassVar[PluginKind] = PluginKind.ANALYZER
     targets: ClassVar[tuple[str, ...]] = ("image/jpeg", "image/tiff")
     priority: ClassVar[int] = 80
-    description: ClassVar[str] = "Extract ASCII and UserComment strings from JPEG/TIFF EXIF."
+    description: ClassVar[str] = (
+        "Extract ASCII, XP, GPS, XMP and UserComment strings from JPEG/TIFF EXIF."
+    )
 
     def run(self, artifact: Artifact, ctx: Context) -> None:
         try:

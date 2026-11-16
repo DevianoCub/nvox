@@ -38,9 +38,9 @@ Nvox/
       tools.py            # external tool registry + detection
       doctor.py           # environment diagnostics
     plugins/              # built-in plugin packs
-      generic/strings.py  # reference plugin
-      decoders/           # base encodings, compression, XOR brute force
-      image/              # minimal EXIF and PNG LSB (deep analysis in M3)
+      generic/            # strings and embedded-container carving
+      decoders/           # base encodings, compression, DEFLATE, XOR brute force
+      image/              # PNG/JPEG/GIF/BMP/TIFF metadata, bit planes, channels
     tui/                  # Textual UI (M4)
   tests/
   docs/

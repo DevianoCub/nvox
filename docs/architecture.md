@@ -44,8 +44,10 @@ technique-specific glue.
 | `core/surfaces.py` | ASCII/UTF-16LE/BE runs with byte offsets | M2 |
 | `core/flags.py` | Flag format compiler, raw regex, surface scan | M2 |
 | `core/findings.py` | Findings, confidence, provenance chain | M2 |
-| `plugins/decoders/` | Base64/base32/hex/rot/xor/gzip/... transform plugins | M2 |
-| `plugins/image/` | Minimal EXIF strings and PNG LSB planes | M2 |
+| `core/magic.py` | Shared format signatures and embedded-container hit detection | M3 |
+| `plugins/decoders/` | Base64/base32/hex/rot/xor/gzip/... transform plugins, raw DEFLATE | M2-M3 |
+| `plugins/image/` | PNG/JPEG/GIF/BMP/TIFF structure and metadata, bit planes, channels | M2-M3 |
+| `plugins/generic/` | Strings plus bounded magic-based container carving | M1-M3 |
 | `core/report/` | Self-contained HTML report | M4 (planned) |
 | `core/config.py` | `nvox.toml` discovery and validation | M0 |
 | `core/tools.py` | External tool registry and detection | M0 |
