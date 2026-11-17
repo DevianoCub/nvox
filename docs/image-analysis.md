@@ -1,9 +1,10 @@
 # Image analysis
 
-> **Status:** M3 complete. The built-in image pack parses PNG, JPEG, GIF,
-> BMP and TIFF metadata and structure, extracts configurable PNG bit planes,
-> detects channel/palette anomalies, carves embedded containers, and decodes raw
-> deflate streams. Optional QR/barcode and OCR bridges are not part of M3.
+> **Status:** M3 complete, with M5 optional bridges. The built-in image pack
+> parses PNG, JPEG, GIF, BMP and TIFF metadata and structure, extracts
+> configurable PNG bit planes, detects channel/palette anomalies, carves embedded
+> containers, and decodes raw deflate streams. QR/barcode and OCR are available
+> through the optional `bridge.zbar` and `bridge.tesseract` plugins.
 
 Nvox treats every image technique as a normal plugin. Extracted chunks, text,
 bit planes and carved files become artifacts, so they are hashed, searched for
@@ -146,8 +147,12 @@ Python worker.
 - EXIF numeric and rational tags are not emitted as text; string tags and
   UserComment are.
 - Carving recognises a fixed signature set and scans a bounded prefix. It is not
-  a replacement for `binwalk`/`foremost`; those bridges arrive in M5.
-- QR/barcode and OCR hooks remain optional future work. `image.lsb` emits image
-  artifacts, so an external decoder can consume them once a bridge is added.
-- A cooperative timeout cannot stop a runaway Python plugin. Hard process
-  isolation for command plugins is M5; optional Python isolation is M7.
+  a replacement for `binwalk`/`foremost`; install those tools to enable the
+  optional `bridge.binwalk` and `bridge.foremost` plugins.
+- QR/barcode and OCR are not built-in Python implementations. They require the
+  optional `zbar` and `tesseract` tools and their bridges; missing tools become
+  requirement skips. Both run on emitted image artifacts as well as the original
+  evidence.
+- A cooperative timeout cannot stop a runaway Python plugin. Command plugins and
+  external bridges run in a bounded subprocess with process-group termination;
+  optional Python isolation is M7.

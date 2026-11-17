@@ -18,8 +18,9 @@ a write-up and for a first-pass investigation.
    type before any analysis runs. The payload is captured once, so an evidence
    file changing on disk mid-scan cannot affect the result.
 3. **Results are reproducible.** `findings.json` records the Nvox version,
-   formats, options, evidence hashes, skips and provenance chains. External
-   tool versions are added to the run manifest in M4/M5.
+   formats, options, evidence hashes, skips and provenance chains. `nvox doctor
+   --verbose` reports detected external tool versions; bridges record their
+   command line and return code in artifact/skip params where applicable.
 4. **Provenance is mandatory.** Every finding carries the chain of plugins and
    parameters that produced it.
 5. **No hidden network access.** Analysis is local. Bridges that would need the
@@ -91,15 +92,17 @@ and finding entries contain the full records described above.
 |---|---|
 | Zip bombs / decompression bombs | artifact size cap, decoder output cap, depth limit; ratio guard in M7 |
 | Infinite plugin chains | content-hash dedup, per-plugin visited set, `max_depth` |
-| Hanging plugins | cooperative per-plugin timeout; hard process-group kill for command plugins in M5 |
-| Huge output floods | artifact size cap; buffered command output is checked after the process exits, streaming caps in M5 |
+| Hanging plugins | cooperative per-plugin timeout; hard process-group kill for command plugins and bridges |
+| Huge output floods | artifact size cap; streamed stdout/stderr and output-file caps for command plugins and bridges |
 | Accidental modification | read-only evidence reads, separate output directory, no in-place writes |
 | Hostile parsers | small stdlib parsers with explicit bounds; process isolation for untrusted Python plugins is planned for M7 |
 
 The cooperative timeout abandons a worker thread; it cannot forcibly stop Python
-code that ignores the deadline. Do not treat M2 as a security sandbox for
-untrusted plugins. External command plugins already run as subprocesses, but
-rlimits and process-group cleanup are part of M5.
+code that ignores the deadline. Command plugins and external bridges run in a
+separate process group with streamed output caps and best-effort POSIX rlimits,
+but this is not a security boundary against a hostile local user. Do not treat
+the default worker-thread model as a sandbox for untrusted Python plugins;
+optional isolation for those is planned for M7.
 
 ## Reporting guidance
 

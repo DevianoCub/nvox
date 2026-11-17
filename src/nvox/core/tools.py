@@ -22,6 +22,7 @@ class ExternalTool:
     stage: str
     nix: str | None = None
     version_args: tuple[str, ...] = field(default=("--version",))
+    bridges: tuple[str, ...] = ()
 
 
 def _tool(
@@ -32,6 +33,7 @@ def _tool(
     stage: str,
     nix: str | None = None,
     version_args: tuple[str, ...] = ("--version",),
+    bridges: tuple[str, ...] = (),
 ) -> ExternalTool:
     return ExternalTool(
         name=name,
@@ -41,6 +43,7 @@ def _tool(
         stage=stage,
         nix=nix,
         version_args=version_args,
+        bridges=bridges,
     )
 
 
@@ -62,6 +65,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "Signature scan and embedded file carving",
         "M5",
         "nixpkgs#binwalk",
+        bridges=("bridge.binwalk",),
     ),
     _tool(
         "foremost",
@@ -70,6 +74,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "File carving from blobs",
         "M5",
         "nixpkgs#foremost",
+        bridges=("bridge.foremost",),
     ),
     _tool("7z", "7z", "archives", "Archive listing and extraction", "M6", "nixpkgs#p7zip"),
     _tool("unzip", "unzip", "archives", "ZIP extraction", "M6", "nixpkgs#unzip"),
@@ -82,6 +87,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "M3",
         "nixpkgs#exiftool",
         ("-ver",),
+        bridges=("bridge.exiftool",),
     ),
     # Images / steganography
     _tool(
@@ -100,6 +106,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "PNG chunk and CRC validation",
         "M3",
         "nixpkgs#pngcheck",
+        bridges=("bridge.pngcheck",),
     ),
     _tool(
         "zsteg",
@@ -108,6 +115,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "PNG/BMP LSB steganography detection",
         "M5",
         "nixpkgs#zsteg",
+        bridges=("bridge.zsteg",),
     ),
     _tool(
         "steghide",
@@ -116,6 +124,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "JPEG/BMP/WAV/au steganography",
         "M5",
         "nixpkgs#steghide",
+        bridges=("bridge.steghide",),
     ),
     _tool(
         "stegseek",
@@ -124,8 +133,17 @@ TOOLS: tuple[ExternalTool, ...] = (
         "Steghide passphrase cracking",
         "M5",
         "nixpkgs#stegseek",
+        bridges=("bridge.stegseek",),
     ),
-    _tool("outguess", "outguess", "stego", "JPEG steganography", "M5", "nixpkgs#outguess"),
+    _tool(
+        "outguess",
+        "outguess",
+        "stego",
+        "JPEG steganography",
+        "M5",
+        "nixpkgs#outguess",
+        bridges=("bridge.outguess",),
+    ),
     _tool("jphide", "jphide", "stego", "JPEG steganography (hide)", "M5"),
     _tool("jpseek", "jpseek", "stego", "JPEG steganography (seek)", "M5"),
     _tool(
@@ -143,9 +161,18 @@ TOOLS: tuple[ExternalTool, ...] = (
         "M5",
         "nixpkgs#jdk",
         ("-version",),
+        bridges=("bridge.stegsolve",),
     ),
     # Barcodes / OCR
-    _tool("zbar", "zbarimg", "ocr", "QR and barcode decoding", "M5", "nixpkgs#zbar"),
+    _tool(
+        "zbar",
+        "zbarimg",
+        "ocr",
+        "QR and barcode decoding",
+        "M5",
+        "nixpkgs#zbar",
+        bridges=("bridge.zbar",),
+    ),
     _tool(
         "tesseract",
         "tesseract",
@@ -154,6 +181,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "M5",
         "nixpkgs#tesseract",
         ("--version",),
+        bridges=("bridge.tesseract",),
     ),
     # Audio / video
     _tool(

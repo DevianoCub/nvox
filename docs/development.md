@@ -19,6 +19,7 @@ uv sync --group dev --extra image --extra tui
 Nvox/
   pyproject.toml          # package metadata, deps, tool config
   nvox.toml.example       # annotated configuration
+  flake.nix               # optional-tools development shell
   src/nvox/
     __init__.py           # __version__ from package metadata
     __main__.py           # python -m nvox
@@ -31,7 +32,9 @@ Nvox/
       registry.py         # plugin discovery and validation
       engine.py           # queue, limits, dedup, hooks dispatch
       hooks.py            # hook dispatch
-      command_plugin.py   # declarative TOML command plugins
+      command_plugin.py   # declarative TOML command plugins + sandbox
+      sandbox.py          # bounded subprocess execution
+      external.py         # output collection and child environment safety
       surfaces.py         # ASCII/UTF-16 run extraction
       flags.py            # flag formats, raw regex, surface scanner
       findings.py         # findings, confidence, provenance chains
@@ -41,6 +44,7 @@ Nvox/
       generic/            # strings and embedded-container carving
       decoders/           # base encodings, compression, DEFLATE, XOR brute force
       image/              # PNG/JPEG/GIF/BMP/TIFF metadata, bit planes, channels
+      bridges/            # optional external-tool bridges
     tui/                  # Textual UI (M4)
   tests/
   docs/
@@ -88,9 +92,10 @@ formatter commands; do not hand-format around them.
 ## External tools
 
 Register new binaries in `src/nvox/core/tools.py` with category, purpose,
-milestone and the matching Nix attribute. `nvox doctor` picks them up
-automatically, and the M5 bridge layer uses the same registry to decide whether
-a bridge can run.
+milestone, the matching Nix attribute and the bridge plugin names that consume
+it. `nvox doctor` picks them up automatically. Bridge plugins declare the binary
+in `requires`; the engine checks it before running and records a `requirement`
+skip when it is missing.
 
 Version probes are best-effort: `probe_version` swallows errors and timeouts,
 and a tool without a version flag still counts as installed.

@@ -13,17 +13,21 @@ nvox scan photo.png --flag-format 'ctf{}'
 ## Status
 
 Early development. **M0 (bootstrap)**, **M1 (core engine)**, **M2 (flag
-engine)**, **M3 (deep image analysis)** and **M4 (UX)** are complete:
-configuration, `nvox doctor`, evidence ingestion, the artifact store, plugin
-discovery, the scheduler/hook engine, `nvox scan`, `nvox plugins`, `nvox extract`,
-`nvox report` and `nvox tui`. The built-in decoder chain covers base encodings,
-common compression and XOR brute force. The image pack parses PNG/JPEG/GIF/BMP/
-TIFF metadata and structure, extracts configurable PNG bit planes, analyses
-palette/alpha/channel anomalies, carves embedded containers and decodes raw
-DEFLATE. Scans write a self-contained HTML report; the Textual TUI supports
-artifact triage with plugin toggles. External bridges and audio land in M5-M7;
-see the [roadmap](docs/roadmap.md), [image analysis coverage](docs/image-analysis.md)
-and [HTML/TUI guide](docs/report.md).
+engine)**, **M3 (deep image analysis)** and **M4 (UX)** are complete;
+**M5 (external bridges and plugin hardening)** is implemented and pending
+acceptance. Nvox provides configuration, `nvox doctor`, evidence ingestion, the
+artifact store, plugin discovery, the scheduler/hook engine, `nvox scan`,
+`nvox plugins`, `nvox extract`, `nvox report` and `nvox tui`. The built-in
+decoder chain covers base encodings, common compression and XOR brute force.
+The image pack parses PNG/JPEG/GIF/BMP/TIFF metadata and structure, extracts
+configurable PNG bit planes, analyses palette/alpha/channel anomalies, carves
+embedded containers and decodes raw DEFLATE. Optional bridges add ExifTool,
+pngcheck, zsteg, steghide, stegseek, outguess, StegSolve, binwalk, foremost,
+zbar and tesseract; missing tools become recorded skips. Scans write a
+self-contained HTML report; the Textual TUI supports artifact triage with plugin
+toggles. Audio lands in M6; see the [roadmap](docs/roadmap.md),
+[image analysis coverage](docs/image-analysis.md) and
+[HTML/TUI guide](docs/report.md).
 
 ## Why it is modular
 
@@ -41,7 +45,8 @@ and [HTML/TUI guide](docs/report.md).
   plugins observe or veto inputs, add artifacts and filter findings.
 - **External tools are optional.** Built-in implementations work on a clean
   Python install. Bridges for `steghide`, `zsteg`, `binwalk`, `exiftool` and
-  friends are planned for M5; `nvox doctor` already reports what is available.
+  friends use the same plugin contract; missing tools are skipped with a reason,
+  and `nvox doctor` reports which bridge uses each binary.
 
 ## Requirements
 
@@ -68,8 +73,8 @@ uv sync --group dev --extra image
 To install all optional external tools at once:
 
 ```bash
-# NixOS / Nix
-nix-shell
+# NixOS / Nix (flake devshell; nix-shell also works)
+nix develop
 
 # Arch Linux (uses yay/paru for AUR packages when available)
 ./scripts/install-arch-tools.sh
@@ -132,10 +137,10 @@ intentionally empty for now.
 | M0 | Bootstrap, config, `doctor` (done) |
 | M1 | Core engine: artifacts, registry, scheduler, hooks (done) |
 | M2 | Flag engine: formats, decoders, XOR brute, provenance (done) |
-| M3 | Deep image analysis and steganography (implemented) |
-| M4 | CLI polish, HTML report, TUI (next) |
-| M5 | External tool bridges, declarative plugin hardening |
-| M6 | Audio and generic file analysis |
+| M3 | Deep image analysis and steganography (done) |
+| M4 | CLI polish, HTML report, TUI (done) |
+| M5 | External tool bridges, declarative plugin hardening (implemented; pending acceptance) |
+| M6 | Audio and generic file analysis (next) |
 | M7 | Hardening, docs, 0.1 release |
 
 ## Legal

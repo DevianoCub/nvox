@@ -151,8 +151,9 @@ Output sections:
 1. **Environment** — Nvox, Python, interpreter path, platform, `uv`, cwd.
 2. **Configuration** — loaded file or defaults, flag formats, limits, plugin
    directories (with existence), disabled tools.
-3. **Tools** — every known external tool grouped by category, with status, path
-   and the milestone that uses it. `*` means found, `o` means not installed.
+3. **Tools** — every known external tool grouped by category, with status, path,
+   the milestone that uses it and the bridge plugin(s) that consume it. `*`
+   means found, `o` means not installed.
 4. **Summary** — available/total count and a `nix shell` hint for missing tools.
 
 The JSON form is stable enough for CI:
@@ -168,9 +169,10 @@ The JSON form is stable enough for CI:
   },
   "tools": [
     {"name": "exiftool", "category": "metadata", "found": true,
-     "path": "/run/current-system/sw/bin/exiftool", "stage": "M3"}
+     "path": "/run/current-system/sw/bin/exiftool", "stage": "M3",
+     "bridges": ["bridge.exiftool"]}
   ],
-  "summary": {"available": 2, "missing": 20, "total": 22}
+  "summary": {"available": 2, "missing": 21, "total": 23}
 }
 ```
 
@@ -190,7 +192,7 @@ nvox plugins dirs            # discovery paths and load order
 | Status | Meaning |
 |---|---|
 | `ok` | Ready to run |
-| `missing` | A binary listed in `requires` is not installed |
+| `missing` | A binary listed in `requires` is not installed; the plugin is skipped |
 | `disabled` | Disabled in `[plugins].disable` or `[tools].disable` |
 
 The `Origin` column is `builtin`, `directory`, `entry-point` or `declared`.

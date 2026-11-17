@@ -39,6 +39,35 @@ disable = []
 # max_pixels = 2000000
 # channels = "all"   # or a channel list/CSV, e.g. "1" or [0, 1, 2]
 
+# Optional external bridge options. Each bridge is skipped when its binary is
+# missing; stegseek additionally needs a wordlist to run.
+# [plugins.options."bridge.stegseek"]
+# wordlist = "/usr/share/wordlists/rockyou.txt"
+# [plugins.options."bridge.steghide"]
+# passphrase = ""
+# [plugins.options."bridge.outguess"]
+# key = ""
+# [plugins.options."bridge.binwalk"]
+# extract = false
+# [plugins.options."bridge.tesseract"]
+# lang = "eng"
+# psm = 6
+# [plugins.options."bridge.stegsolve"]
+# jar = "/opt/Stegsolve.jar"
+# command = ["/path/to/headless-stegsolve", "{input}", "{outdir}"]
+
+# Declarative command plugins can set their own sandbox limits in their own
+# plugin .toml file (not in nvox.toml), for example:
+# [plugin.sandbox]
+# timeout = 60
+# max_output_bytes = 1048576
+# max_file_bytes = 16777216
+# max_files = 1000
+# max_total_bytes = 67108864
+# inherit_env = false
+# env = { TESSDATA_PREFIX = "/custom/tessdata" }
+
 [tools]
 # External tools that should never be invoked.
 disable = []
+# disable = ["steghide"]

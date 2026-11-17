@@ -1,10 +1,11 @@
 # Plugins
 
-> **Status:** implemented through M3. The stable import surface is `nvox.api`
+> **Status:** implemented through M5. The stable import surface is `nvox.api`
 > (`API_VERSION = 1`). The built-in image pack covers PNG/JPEG/GIF/BMP/TIFF
 > metadata and structure, configurable bit planes, channel analysis, carving and
-> DEFLATE; audio arrives in M6. Command plugins gain hard sandboxing in M5 and
-> optional process isolation for Python plugins is planned for M7.
+> DEFLATE. Command plugins and external bridges run in bounded subprocesses;
+> optional process isolation for Python plugins is planned for M7. Audio arrives
+> in M6.
 
 Everything that analyses, extracts or decodes is a plugin. The core provides
 evidence handling, the artifact store, scheduling, flag scanning and reporting;
@@ -29,6 +30,7 @@ scanner searches them with full provenance.
 | `generic` | `generic.strings` (ASCII + UTF-16LE/BE runs), `generic.carve` (embedded containers) | M1-M3 |
 | `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `deflate`, `xor` | M2-M3 |
 | `image` | `image.structure`, `image.png_chunks`, `image.jpeg`, `image.exif`, `image.gif`, `image.bmp`, `image.tiff`, `image.channels`, `image.lsb` | M2-M3 |
+| `bridges` | `bridge.exiftool`, `bridge.pngcheck`, `bridge.zsteg`, `bridge.steghide`, `bridge.stegseek`, `bridge.outguess`, `bridge.stegsolve`, `bridge.binwalk`, `bridge.foremost`, `bridge.zbar`, `bridge.tesseract` | M5 |
 
 The image pack is documented in detail, with options and limitations, in
 [Image analysis](image-analysis.md).
@@ -36,6 +38,61 @@ The image pack is documented in detail, with options and limitations, in
 The decoder pack is intentionally conservative: base encodings must validate
 and produce meaningful text/magic, compression is magic-gated, and XOR keeps
 only the best-scored candidates. See [Flag engine](flag-engine.md).
+
+## External tool bridges
+
+Bridge plugins are normal Python plugins with a binary in `requires`. The engine
+checks the requirement before running them, so a missing tool is recorded as a
+`requirement` skip and the scan continues. `--no-external` removes command
+plugins and every plugin with a non-empty `requires`, which is useful for a
+reproducible built-in-only run.
+
+| Plugin | Tool | Typical inputs | Result |
+|---|---|---|---|
+| `bridge.exiftool` | `exiftool` | Images, audio, video, PDF, ZIP | Grouped JSON metadata |
+| `bridge.pngcheck` | `pngcheck` | PNG | Verbose chunk/CRC report |
+| `bridge.zsteg` | `zsteg` | PNG, BMP | LSB scan report |
+| `bridge.steghide` | `steghide` | JPEG, BMP, WAV, AU | Probe report and extracted payload |
+| `bridge.stegseek` | `stegseek` | JPEG, BMP, WAV, AU | Wordlist-cracked steghide payload |
+| `bridge.outguess` | `outguess` | JPEG | Extracted payload |
+| `bridge.stegsolve` | `java` | Images | Configured headless command output |
+| `bridge.binwalk` | `binwalk` | Generic non-text artifacts | Signature report; optional extraction |
+| `bridge.foremost` | `foremost` | Generic non-text artifacts | Carved files |
+| `bridge.zbar` | `zbarimg` | Images | Decoded QR/barcode text |
+| `bridge.tesseract` | `tesseract` | Images | OCR text |
+
+Bridge options live under `[plugins.options."bridge.<tool>"]`:
+
+```toml
+[plugins.options."bridge.stegseek"]
+wordlist = "/usr/share/wordlists/rockyou.txt"
+
+[plugins.options."bridge.steghide"]
+passphrase = ""
+
+[plugins.options."bridge.outguess"]
+key = ""
+
+[plugins.options."bridge.foremost"]
+types = ""                 # empty uses foremost's defaults
+
+[plugins.options."bridge.binwalk"]
+extract = false
+
+[plugins.options."bridge.tesseract"]
+lang = "eng"
+psm = 6
+
+[plugins.options."bridge.stegsolve"]
+# jar = "/opt/Stegsolve.jar"
+command = ["/path/to/headless-stegsolve", "{input}", "{outdir}"]
+```
+
+`bridge.stegseek` skips until a wordlist is configured. StegSolve is an
+interactive Java GUI; the bridge accepts a `command` list for a headless fork or
+wrapper, and otherwise reports a skip rather than opening a window during a
+scan. All bridges use the same sandbox, timeout, output and file-size limits as
+declarative command plugins.
 
 ## Discovery
 
@@ -131,8 +188,10 @@ emit derived *content*, not a byte-identical reinterpretation of its input.
 The engine enforces `scan.max_artifact_bytes` on every emission and checks the
 plugin deadline cooperatively. Python plugins run in worker threads, which
 cannot be force-killed; a runaway plugin is abandoned at its timeout and its
-later emissions are ignored. Hard process isolation is part of M5 for command
-plugins and is planned as an optional mode for Python plugins in M7.
+later emissions are ignored. Command plugins and external bridges run in a
+separate process group with a hard wall-clock timeout in
+`nvox.core.sandbox`. Optional process isolation for arbitrary Python plugins is
+planned for M7.
 
 Plugins must not write to the evidence or to arbitrary paths. Use the context
 to emit artifacts; the store decides where they live.
@@ -167,25 +226,70 @@ Placeholders available in `command`:
 
 Unknown `{name}` placeholders are left untouched, so shell snippets such as
 `awk '{print}'` and JSON literals work as written. Commands are executed
-directly (no shell) with a per-plugin timeout.
+directly (no shell) through `nvox.core.sandbox.run_command`. If `requires` is
+omitted, the first command token is added automatically when it looks like a
+binary name, so a missing tool becomes an engine-level requirement skip.
 
 `output` modes:
 
 - `text` — stdout decoded as UTF-8 text;
 - `bytes` — stdout stored as a binary artifact;
-- `files` — every file written under `{outdir}` becomes an artifact (up to
-  1000 files);
+- `files` — every regular file written under `{outdir}` becomes an artifact;
+  symlinks and files outside the output directory are ignored, and the file
+  count/byte caps below are applied;
 - `json` — stdout parsed as JSON; a top-level object becomes a metadata
   artifact, other values are wrapped as `{"value": ...}`.
 
-A non-zero exit code with no stdout is recorded as a skip, including a short
-stderr tail. Requirements listed in `requires` are checked before execution;
-missing tools produce a skip and never prevent other plugins from running.
+For `text`, `bytes` and `json` output, a non-zero exit code with no stdout is
+recorded as a skip, including a short stderr tail. A non-zero exit that still
+produced stdout is kept as an artifact with `returncode` in its params, because
+many forensic tools report warnings while still emitting useful data. In
+`files` mode, regular files are retained even when the process exits non-zero;
+the artifact carries the `returncode` and a short stderr tail so the partial
+result is visible rather than silently lost. Requirements listed in `requires`
+are checked before execution; missing tools produce a skip and never prevent
+other plugins from running.
 
-Current limits: stdout is buffered by the child process before the artifact
-size cap is applied, and command plugins run with the invoking user's
-permissions. Process-group kill, output streaming caps and rlimits are added
-with `core/sandbox.py` in M5.
+### Command sandbox
+
+Every command plugin gets:
+
+- a wall-clock timeout (`plugin.timeout`, or `[plugin.sandbox].timeout`);
+- process-group termination on timeout, so forked children are stopped too;
+- streamed stdout/stderr caps, applied while the child runs;
+- best-effort POSIX `RLIMIT_CPU`, `RLIMIT_FSIZE` and `RLIMIT_CORE` limits;
+- a per-command file-count, per-file and total output cap;
+- symlink-safe output collection confined to `{outdir}`;
+- a minimal environment: `PATH` and locale are inherited, while `HOME`,
+  `TMPDIR`, `XDG_CONFIG_HOME` and `XDG_CACHE_HOME` point into the temporary
+  workspace.
+
+The optional `[plugin.sandbox]` table controls the limits:
+
+```toml
+[plugin]
+name = "example.tool"
+command = ["tool", "--json", "{input}"]
+output = "json"
+
+[plugin.sandbox]
+timeout = 60
+max_output_bytes = 1048576
+max_file_bytes = 16777216
+max_files = 1000
+max_total_bytes = 67108864
+inherit_env = false
+env = { TESSDATA_PREFIX = "/custom/tessdata" }
+```
+
+`inherit_env = true` passes the whole caller environment; prefer `env` for the
+few variables a tool actually needs. Flat keys such as `plugin.max_output_bytes`
+are accepted for compact definitions, but the table form is recommended.
+
+The sandbox is a cooperative containment layer for local CTF/forensics work,
+not a security boundary against a hostile local user. It does not create a
+network namespace, drop privileges or restrict arbitrary syscalls. Run untrusted
+binaries under an OS-level sandbox if that is required.
 
 ## Hooks
 

@@ -40,7 +40,7 @@ technique-specific glue.
 | `core/registry.py` | Plugin discovery and validation (built-ins, dirs, entry points, declared) | M1 |
 | `core/engine.py` | Queue, priorities, timeouts, depth/size budgets, dedup, workers | M1 |
 | `core/hooks.py` | `pre_ingest`, `on_artifact`, `post_scan`, `on_finding` dispatch | M1 |
-| `core/command_plugin.py` | Declarative TOML command plugins | M1 |
+| `core/command_plugin.py` | Declarative TOML command plugins, sandbox and output caps | M1/M5 |
 | `core/surfaces.py` | ASCII/UTF-16LE/BE runs with byte offsets | M2 |
 | `core/flags.py` | Flag format compiler, raw regex, surface scan | M2 |
 | `core/findings.py` | Findings, confidence, provenance chain | M2 |
@@ -48,11 +48,13 @@ technique-specific glue.
 | `plugins/decoders/` | Base64/base32/hex/rot/xor/gzip/... transform plugins, raw DEFLATE | M2-M3 |
 | `plugins/image/` | PNG/JPEG/GIF/BMP/TIFF structure and metadata, bit planes, channels | M2-M3 |
 | `plugins/generic/` | Strings plus bounded magic-based container carving | M1-M3 |
-| `core/report/` | Self-contained HTML report | M4 (planned) |
+| `plugins/bridges/` | Optional external-tool bridges with requirement skips | M5 |
+| `core/report/` | Self-contained HTML report | M4 |
 | `core/config.py` | `nvox.toml` discovery and validation | M0 |
 | `core/tools.py` | External tool registry and detection | M0 |
 | `core/doctor.py` | Environment diagnostics | M0 |
-| `core/sandbox.py` | Hardened subprocess execution with rlimits and process-group kill | M5 |
+| `core/sandbox.py` | Bounded subprocess execution: streamed output caps, rlimits and process-group kill | M5 |
+| `core/external.py` | Shared child environment and symlink-safe output collection | M5 |
 | `api.py` | Stable plugin API (`API_VERSION`) | M1 |
 | `cli.py` | Typer commands | M0+ |
 | `tui/` | Textual interface | M4 |
@@ -100,9 +102,9 @@ no core changes. See [Plugins](plugins.md).
 - **Timeout** (`scan.timeout`, default 120s): per plugin invocation. Python
   plugins run in worker threads and check a cooperative deadline on emission;
   a hung plugin is abandoned at its timeout and late emissions are ignored.
-  Command plugins additionally receive a subprocess timeout. Hard process
-  isolation lands in M5 for command plugins and is planned as an optional mode
-  for Python plugins in M7.
+  Command plugins and external bridges additionally receive a hard subprocess
+  timeout, process-group termination and streamed output caps. Optional process
+  isolation for Python plugins is planned for M7.
 - **Size** (`scan.max_artifact_bytes`): upper bound for materialised artifacts;
   oversized emissions become skips.
 - **Workers** (`scan.jobs`, default auto): up to this many plugin invocations
@@ -153,8 +155,8 @@ accelerators, not as the definition of a feature.
 
 ## Extension points
 
-1. Built-in plugin packs: `src/nvox/plugins/{generic,decoders,image}` today;
-   `audio` and `bridges` are planned for M6/M5.
+1. Built-in plugin packs: `src/nvox/plugins/{generic,decoders,image,bridges}`
+   today; `audio` is planned for M6.
 2. Local plugin directories: `./plugins`, `~/.config/nvox/plugins`.
 3. Installed packages exposing the `nvox.plugins` entry point.
 4. Declarative TOML plugins wrapping any command.

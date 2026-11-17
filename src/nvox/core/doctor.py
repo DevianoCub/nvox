@@ -27,6 +27,7 @@ class ToolReport(TypedDict):
     found: bool
     path: str | None
     version: str | None
+    bridges: list[str]
 
 
 class DoctorReport(TypedDict):
@@ -56,6 +57,7 @@ def _tool_report(tool: ExternalTool, *, verbose: bool) -> ToolReport:
         found=path is not None,
         path=path,
         version=version,
+        bridges=list(tool.bridges),
     )
 
 
@@ -154,7 +156,10 @@ def render(console: Console, report: DoctorReport) -> None:
             tool_version = tool["version"]
             if tool_version:
                 location = f"{location}\n[dim]{escape(tool_version)}[/]"
-            table.add_row(status, tool["name"], tool["purpose"], location, tool["stage"])
+            purpose = tool["purpose"]
+            if tool["bridges"]:
+                purpose = f"{purpose}\n[dim]bridge: {', '.join(tool['bridges'])}[/]"
+            table.add_row(status, tool["name"], purpose, location, tool["stage"])
         console.print(table)
         console.print()
 

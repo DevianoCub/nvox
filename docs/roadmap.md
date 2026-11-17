@@ -72,7 +72,7 @@ overlapping windows remain M5/M7 performance work; M2 artifacts are in memory.
 - [x] Automatic zlib/deflate detection on bitstreams
 - [x] Palette and alpha anomalies, channel filters, bit-plane images
 - [x] Embedded file detection by magic bytes and carving
-- [ ] Optional: QR/barcode and OCR hooks (deferred; extension points reserved)
+- [x] Optional QR/barcode and OCR hooks (M5 bridges: `bridge.zbar`, `bridge.tesseract`)
 
 Acceptance: one fixture per technique in `tests/test_image_deep.py`; a 12 MP
 PNG completes in 48.7 s against the default 120 s budget; the coverage table
@@ -90,20 +90,26 @@ Acceptance: a real sample is triaged end-to-end from the terminal, and the HTML
 report opens offline. The report and terminal workflow are documented in
 [HTML reports and TUI](report.md).
 
-## M5 — Bridges and declarative plugins
+## M5 — Bridges and declarative plugins (implemented; pending acceptance)
 
-- [ ] `core/sandbox.py`: rlimits, process-group kill, streamed output caps for
-      command plugins
-- [ ] Bridges: exiftool, zsteg, steghide, stegseek, outguess, pngcheck,
-      binwalk, foremost, StegSolve, zbar, tesseract
-- [ ] Harden declarative TOML command plugins (basic runner landed in M1)
-- [ ] `doctor` integration and graceful skips when tools are missing
+- [x] `core/sandbox.py`: rlimits, process-group kill, streamed output caps for
+      command plugins and bridges
+- [x] Bridges: exiftool, zsteg, steghide, stegseek, outguess, pngcheck,
+      binwalk, foremost, StegSolve, zbar, tesseract. StegSolve is GUI-only and
+      requires a configured headless command; otherwise it records a skip.
+- [x] Harden declarative TOML command plugins (sandbox, minimal environment,
+      automatic executable requirements, symlink-safe file collection and
+      output/file caps)
+- [x] `doctor` integration (bridge names per tool) and graceful requirement
+      skips when tools are missing
 - [x] `shell.nix` and Arch installer script with available optional tools
       (delivered early; `jphide`, `jpseek` and `stegdetect` remain unpackaged)
-- [ ] `flake.nix` devshell with all optional tools
+- [x] `flake.nix` devshell with all optional tools
 
 Acceptance: with tools installed everything runs; without them every bridge is
-skipped with a reason and the scan still completes.
+skipped with a reason and the scan still completes. Bridge tests use fake
+executables on `PATH`, and a separate scan test removes every requirement to
+verify that the artifact pipeline still completes.
 
 ## M6 — Audio and generic files
 

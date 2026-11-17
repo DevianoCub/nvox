@@ -22,6 +22,12 @@ def test_tools_have_metadata() -> None:
             assert tool.nix.startswith("nixpkgs#")
 
 
+def test_bridge_names_are_declared_for_optional_tools() -> None:
+    for tool in TOOLS:
+        for bridge in tool.bridges:
+            assert bridge.startswith("bridge.")
+
+
 def test_expected_categories_are_covered() -> None:
     categories = {tool.category for tool in TOOLS}
     assert {"generic", "image", "audio", "metadata", "stego"} <= categories

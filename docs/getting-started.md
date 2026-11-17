@@ -97,24 +97,28 @@ External tools are never required. The repository includes install helpers:
 
 ```bash
 # NixOS / Nix: all tools available in nixpkgs
-nix-shell
+nix develop          # flake.nix devshell
+# or: nix-shell
 
 # Arch Linux: official packages plus AUR via yay/paru
 ./scripts/install-arch-tools.sh
 ```
 
-Then re-run `nvox doctor` to confirm detection. Note that `zsteg` also requires
-Ruby, StegSolve is a Java jar, and `jphide`, `jpseek` and `stegdetect` are not
-packaged in nixpkgs or Arch. See [Tooling setup](tooling.md).
+Then re-run `nvox doctor` to confirm detection. The tool table shows the bridge
+plugin that uses each binary. Missing tools are skipped with a `requirement`
+reason; the scan continues. Note that `zsteg` also requires Ruby, StegSolve is a
+Java GUI, and `jphide`, `jpseek` and `stegdetect` are not packaged in nixpkgs or
+Arch. See [Tooling setup](tooling.md).
 
 Do not want a tool used even when installed? Add it to `[tools].disable`.
 
 ## What's next
 
-M4 is complete: `nvox scan` walks the artifact graph, analyses PNG/JPEG/GIF/BMP/
-TIFF structure and metadata, extracts configurable PNG bit planes, runs the
-built-in decoders and reports findings with provenance. With no flag format it
-runs artifact-only mode and writes the full report to JSON/CSV plus a
+M0-M4 are complete and M5 is implemented pending acceptance: `nvox scan` walks
+the artifact graph, analyses PNG/JPEG/GIF/BMP/TIFF structure and metadata,
+extracts configurable PNG bit planes, runs the built-in decoders, optionally
+invokes external bridges and reports findings with provenance. With no flag
+format it runs artifact-only mode and writes the full report to JSON/CSV plus a
 self-contained HTML report. A first run:
 
 ```bash
@@ -131,5 +135,6 @@ format the command exits with code `2` when it finds a flag. `nvox extract
 <sha256>` reproduces any artifact from the store. Image technique coverage is in
 [Image analysis](image-analysis.md), HTML/TUI usage is in
 [HTML reports and TUI](report.md), and optional tool setup is in
-[Tooling setup](tooling.md). External bridges and audio arrive in M5-M7. See the
-[roadmap](roadmap.md) for the order of work.
+[Tooling setup](tooling.md). M5 adds optional external bridges and a hardened
+command-plugin sandbox; audio arrives in M6. See the [roadmap](roadmap.md) for
+the order of work.

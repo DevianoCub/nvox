@@ -25,7 +25,9 @@ nvox scan photo.png --flag-format 'ctf{}'
    to a separate directory and every artifact is addressed by SHA-256.
 5. **Bounded analysis.** Depth, plugin timeouts, artifact size and worker count
    are configurable and enforced. CLI scans write findings and provenance as
-   JSON; cooperative timeouts are not a security sandbox (M5/M7 add isolation).
+   JSON. Command plugins and external bridges run in bounded subprocesses;
+   cooperative Python timeouts are not a security sandbox (optional Python
+   isolation is planned for M7).
 
 ## Current status
 
@@ -38,8 +40,8 @@ Nvox is under active development.
 | M2 | Flag engine: formats, decoders, XOR brute, provenance | done |
 | M3 | Deep image analysis and steganography | done |
 | M4 | CLI polish, HTML report, TUI | done |
-| M5 | External tool bridges, declarative plugin hardening | next |
-| M6 | Audio and generic file analysis | planned |
+| M5 | External tool bridges, declarative plugin hardening | implemented; pending acceptance |
+| M6 | Audio and generic file analysis | next |
 | M7 | Hardening, docs, 0.1 release | planned |
 
 Working commands today: `nvox scan`, `nvox doctor`,
@@ -50,7 +52,10 @@ embedded-container carving and raw DEFLATE decoding. `nvox scan` also runs
 without a flag format: it writes the complete artifact report to JSON/CSV and
 HTML instead of printing everything in the terminal. M4 adds live progress,
 grouped findings, a self-contained HTML report and a Textual triage interface.
-Everything documented as "planned" describes the target design and is not
+M5 adds optional bridges for ExifTool, pngcheck, zsteg, steghide, stegseek,
+outguess, StegSolve, binwalk, foremost, zbar and tesseract, plus a hardened
+command-plugin sandbox. Missing tools are recorded as skips and never abort a
+scan. Everything documented as "planned" describes the target design and is not
 implemented yet; each page marks its status explicitly.
 
 ## Documentation
