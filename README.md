@@ -13,15 +13,17 @@ nvox scan photo.png --flag-format 'ctf{}'
 ## Status
 
 Early development. **M0 (bootstrap)**, **M1 (core engine)**, **M2 (flag
-engine)** and **M3 (deep image analysis)** are complete:
+engine)**, **M3 (deep image analysis)** and **M4 (UX)** are complete:
 configuration, `nvox doctor`, evidence ingestion, the artifact store, plugin
-discovery, the scheduler/hook engine, `nvox scan`, `nvox plugins` and
-`nvox extract`. The built-in decoder chain covers base encodings, common
-compression and XOR brute force. The image pack parses PNG/JPEG/GIF/BMP/TIFF
-metadata and structure, extracts configurable PNG bit planes, analyses
+discovery, the scheduler/hook engine, `nvox scan`, `nvox plugins`, `nvox extract`,
+`nvox report` and `nvox tui`. The built-in decoder chain covers base encodings,
+common compression and XOR brute force. The image pack parses PNG/JPEG/GIF/BMP/
+TIFF metadata and structure, extracts configurable PNG bit planes, analyses
 palette/alpha/channel anomalies, carves embedded containers and decodes raw
-DEFLATE. External bridges, audio, the HTML report and the TUI land in M4-M7; see
-the [roadmap](docs/roadmap.md) and [image analysis coverage](docs/image-analysis.md).
+DEFLATE. Scans write a self-contained HTML report; the Textual TUI supports
+artifact triage with plugin toggles. External bridges and audio land in M5-M7;
+see the [roadmap](docs/roadmap.md), [image analysis coverage](docs/image-analysis.md)
+and [HTML/TUI guide](docs/report.md).
 
 ## Why it is modular
 
@@ -80,9 +82,14 @@ See [docs/tooling.md](docs/tooling.md) for details and unavailable tools.
 ```bash
 nvox scan photo.png                              # artifact-only scan, no flag search
 nvox scan photo.png --csv --out out/             # artifact CSV for spreadsheets
+nvox scan photo.png --no-html --out out/         # skip the HTML report
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./dump --flag 'flag\{[^}]+\}' -i --depth 4
 nvox scan challenge.bin --flag-format 'htb{}' --json --out out/
+nvox report out/                                 # re-render HTML without rescanning
+nvox report out/ --open                          # open the report in a browser
+nvox tui --report out/                           # Textual artifact browser
+nvox tui challenge.png --out out/                # scan and browse
 nvox doctor                      # environment, config and external tools
 nvox doctor --json               # machine-readable diagnostics
 nvox plugins list                # loaded plugins and availability
@@ -90,6 +97,12 @@ nvox plugins info generic.strings
 nvox plugins dirs                # discovery order and paths
 nvox extract <sha256> --store out/
 nvox --version
+```
+
+The TUI requires the optional extra:
+
+```bash
+uv sync --extra tui
 ```
 
 Flag formats are user supplied: `{}` is the only placeholder and the braces are
@@ -101,6 +114,7 @@ format, it exits with code `2` when at least one flag is found; `--json` emits
 stdout-only JSON.
 
 See [docs/cli.md](docs/cli.md) for the full interface,
+[docs/report.md](docs/report.md) for HTML/TUI triage,
 [docs/plugins.md](docs/plugins.md) for writing plugins,
 [docs/image-analysis.md](docs/image-analysis.md) for the M3 technique coverage
 and limitations, and [docs/tooling.md](docs/tooling.md) for optional tools.

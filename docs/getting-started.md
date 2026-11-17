@@ -111,21 +111,25 @@ Do not want a tool used even when installed? Add it to `[tools].disable`.
 
 ## What's next
 
-M3 is complete: `nvox scan` walks the artifact graph, analyses PNG/JPEG/GIF/BMP/
+M4 is complete: `nvox scan` walks the artifact graph, analyses PNG/JPEG/GIF/BMP/
 TIFF structure and metadata, extracts configurable PNG bit planes, runs the
 built-in decoders and reports findings with provenance. With no flag format it
-runs artifact-only mode and writes the full report to JSON/CSV. A first run:
+runs artifact-only mode and writes the full report to JSON/CSV plus a
+self-contained HTML report. A first run:
 
 ```bash
-nvox scan photo.png                              # artifact-only, JSON report
+nvox scan photo.png                              # artifact-only, JSON + HTML
 nvox scan photo.png --csv --out out/             # plus artifacts.csv
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./evidence --flag-format 'htb{}' --flag 'FLAG\{[^}]+\}' -i --json
+nvox report out/                                 # re-render HTML without rescanning
+nvox tui --report out/                           # interactive artifact browser
 ```
 
-The report is written to `out/findings.json`; with a flag format the command
-exits with code `2` when it finds a flag. `nvox extract <sha256>` reproduces any
-artifact from the store. Image technique coverage is in
-[Image analysis](image-analysis.md); optional tool setup is in
-[Tooling setup](tooling.md). External bridges, audio, and the HTML/TUI reports
-arrive in M4-M7. See the [roadmap](roadmap.md) for the order of work.
+The report is written to `out/findings.json` and `out/report.html`; with a flag
+format the command exits with code `2` when it finds a flag. `nvox extract
+<sha256>` reproduces any artifact from the store. Image technique coverage is in
+[Image analysis](image-analysis.md), HTML/TUI usage is in
+[HTML reports and TUI](report.md), and optional tool setup is in
+[Tooling setup](tooling.md). External bridges and audio arrive in M5-M7. See the
+[roadmap](roadmap.md) for the order of work.

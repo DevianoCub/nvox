@@ -108,7 +108,7 @@ Run only the M3 suite:
 .venv/bin/pytest -q tests/test_image_deep.py
 ```
 
-The full suite covers 201 tests after M3 and the pre-M4 tooling pass.
+The full suite covers 215 tests after M4.
 
 ## Performance
 

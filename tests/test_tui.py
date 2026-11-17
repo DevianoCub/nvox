@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+pytest.importorskip("textual")
+
 from nvox.cli import app as cli_app
 from nvox.core.config import Config
 from nvox.tui import (
@@ -17,8 +19,6 @@ from nvox.tui import (
     artifact_preview,
     finding_preview,
 )
-
-pytest.importorskip("textual")
 
 runner = CliRunner()
 
@@ -105,6 +105,26 @@ def test_tui_plugin_toggles(tmp_path: Path) -> None:
             assert app._selected_plugins()
 
     asyncio.run(run())
+
+
+def test_tui_command_wires_report_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    out = _scan(tmp_path)
+    captured: dict[str, object] = {}
+
+    class FakeTui:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        def run(self) -> None:
+            captured["ran"] = True
+
+    import nvox.tui
+
+    monkeypatch.setattr(nvox.tui, "NvoxTui", FakeTui)
+    result = runner.invoke(cli_app, ["tui", "--report", str(out)])
+    assert result.exit_code == 0, result.output
+    assert captured["report_source"] == out
+    assert captured["ran"] is True
 
 
 def test_tui_scan_worker(tmp_path: Path) -> None:

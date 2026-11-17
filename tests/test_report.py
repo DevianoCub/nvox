@@ -120,7 +120,7 @@ def test_load_report_errors(tmp_path: Path) -> None:
     broken.write_text("{", encoding="utf-8")
     with pytest.raises(ReportError, match="invalid JSON"):
         load_report(broken)
-    broken.write_text('[]', encoding="utf-8")
+    broken.write_text("[]", encoding="utf-8")
     with pytest.raises(ReportError, match="JSON object"):
         load_report(broken)
     broken.write_text('{"evidence": []}', encoding="utf-8")
