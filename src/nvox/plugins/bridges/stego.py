@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import ClassVar
@@ -15,6 +16,39 @@ _PLACEHOLDER = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 def _render(part: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), part)
+
+
+def default_wordlist() -> Path | None:
+    """Return the first auto-detected wordlist, if one is installed.
+
+    The helper script writes to the XDG data directory. Common distribution
+    paths and SecLists installations are also accepted so an explicit config
+    entry is not required when a wordlist is already present.
+    """
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    data_home = Path(xdg_data_home) if xdg_data_home else Path.home() / ".local" / "share"
+    candidates = (
+        data_home / "nvox" / "wordlists" / "rockyou.txt",
+        Path.home() / ".local" / "share" / "nvox" / "wordlists" / "rockyou.txt",
+        Path("/usr/share/wordlists/rockyou.txt"),
+        Path("/usr/share/seclists/Passwords/Leaked-Databases/rockyou.txt"),
+        Path("/usr/share/wordlists/seclists/Passwords/Leaked-Databases/rockyou.txt"),
+    )
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _wordlist_hint() -> str:
+    return (
+        "run scripts/install-wordlist.sh (installs ~/.local/share/nvox/wordlists/"
+        'rockyou.txt) or set plugins.options["bridge.stegseek"].wordlist'
+    )
 
 
 @register
@@ -150,11 +184,15 @@ class StegseekBridge(ExternalBridge):
 
     def build_argv(self, input_path: Path, output_dir: Path, ctx: Context) -> list[str]:
         wordlist_raw = str(ctx.option("wordlist", "")).strip()
-        if not wordlist_raw:
-            ctx.skip('stegseek: set plugins.options["bridge.stegseek"].wordlist')
-        wordlist = Path(wordlist_raw).expanduser()
+        if wordlist_raw:
+            wordlist = Path(wordlist_raw).expanduser()
+        else:
+            detected = default_wordlist()
+            if detected is None:
+                ctx.skip(f"stegseek: no wordlist available; {_wordlist_hint()}")
+            wordlist = detected
         if not wordlist.is_file():
-            ctx.skip(f"stegseek: wordlist is not a file: {wordlist}")
+            ctx.skip(f"stegseek: wordlist is not a file: {wordlist}; {_wordlist_hint()}")
         # The child runs inside the temporary workspace, so a relative wordlist
         # must be resolved before it is handed to stegseek.
         wordlist = wordlist.resolve()

@@ -17,7 +17,7 @@ from nvox.api import (
     PluginKind,
     register,
 )
-from nvox.core.surfaces import ascii_runs, utf16_runs
+from nvox.core.surfaces import ascii_runs, utf16_runs, utf32_runs
 
 _MAX_STRINGS = 20000
 _MAX_CHARS = 1_000_000
@@ -25,15 +25,19 @@ _MAX_CHARS = 1_000_000
 
 @register
 class StringsPlugin(Analyzer):
-    """Extract ASCII and UTF-16 printable runs from bytes."""
+    """Extract ASCII, UTF-16 and UTF-32 printable runs from bytes."""
 
     name: ClassVar[str] = "generic.strings"
-    version: ClassVar[str] = "0.2.0"
+    version: ClassVar[str] = "0.3.0"
     kind: ClassVar[PluginKind] = PluginKind.ANALYZER
     targets: ClassVar[tuple[str, ...]] = ("*/*",)
     priority: ClassVar[int] = 90
-    description: ClassVar[str] = "Extract ASCII and UTF-16LE/BE printable runs from bytes."
-    options: ClassVar[dict[str, object]] = {"min_length": 4, "utf16": True}
+    description: ClassVar[str] = "Extract ASCII, UTF-16LE/BE and UTF-32LE/BE printable runs."
+    options: ClassVar[dict[str, object]] = {
+        "min_length": 4,
+        "utf16": True,
+        "utf32": True,
+    }
 
     def accepts(self, artifact: Artifact) -> bool:
         if artifact.kind in (ArtifactKind.TEXT, ArtifactKind.META):
@@ -48,6 +52,16 @@ class StringsPlugin(Analyzer):
                 runs.extend(
                     run.text
                     for run in utf16_runs(
+                        artifact.payload,
+                        min_length,
+                        byte_order=byte_order,
+                    )
+                )
+        if ctx.option("utf32", True):
+            for byte_order in ("little", "big"):
+                runs.extend(
+                    run.text
+                    for run in utf32_runs(
                         artifact.payload,
                         min_length,
                         byte_order=byte_order,

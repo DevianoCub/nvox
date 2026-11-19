@@ -86,11 +86,51 @@ def utf16_runs(
             yield TextRun(start, "".join(chars), encoding)
 
 
+def utf32_runs(
+    data: bytes,
+    min_length: int = 4,
+    *,
+    byte_order: str = "little",
+) -> Iterator[TextRun]:
+    """Yield ASCII-subset UTF-32 runs.
+
+    All four byte alignments are tried because a payload may not start on a
+    4-byte boundary. Only ASCII-range codepoints are accepted to keep the
+    result deterministic and useful for flags and strings.
+    """
+    if byte_order not in {"little", "big"}:
+        raise ValueError(f"unsupported byte order: {byte_order!r}")
+    minimum = max(1, min_length)
+    encoding = "utf-32-le" if byte_order == "little" else "utf-32-be"
+    little = byte_order == "little"
+
+    for alignment in range(4):
+        index = alignment
+        start: int | None = None
+        chars: list[str] = []
+        while index + 3 < len(data):
+            raw = data[index : index + 4]
+            codepoint = int.from_bytes(raw, "little" if little else "big")
+            if codepoint in _PRINTABLE:
+                if start is None:
+                    start = index
+                chars.append(chr(codepoint))
+            else:
+                if start is not None and len(chars) >= minimum:
+                    yield TextRun(start, "".join(chars), encoding)
+                start = None
+                chars.clear()
+            index += 4
+        if start is not None and len(chars) >= minimum:
+            yield TextRun(start, "".join(chars), encoding)
+
+
 def text_runs(
     data: bytes,
     min_length: int = 4,
     *,
     utf16: bool = True,
+    utf32: bool = False,
     include_tab: bool = True,
 ) -> Iterator[TextRun]:
     """Yield every supported text surface in a stable order."""
@@ -98,6 +138,9 @@ def text_runs(
     if utf16:
         yield from utf16_runs(data, min_length, byte_order="little")
         yield from utf16_runs(data, min_length, byte_order="big")
+    if utf32:
+        yield from utf32_runs(data, min_length, byte_order="little")
+        yield from utf32_runs(data, min_length, byte_order="big")
 
 
-__all__ = ["TextRun", "ascii_runs", "text_runs", "utf16_runs"]
+__all__ = ["TextRun", "ascii_runs", "text_runs", "utf16_runs", "utf32_runs"]

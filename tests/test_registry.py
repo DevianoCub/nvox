@@ -40,6 +40,11 @@ def test_load_builtin_plugins() -> None:
     registry = PluginRegistry()
     registry.load_builtin()
     assert registry.get("generic.strings") is not None
+    assert registry.get("audio.wav") is not None
+    assert registry.get("audio.spectrogram") is not None
+    assert registry.get("generic.archive") is not None
+    assert registry.get("generic.pdf") is not None
+    assert registry.get("generic.office") is not None
     assert registry.warnings == []
 
 

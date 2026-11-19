@@ -5,14 +5,16 @@
 #
 # Official repositories are installed with pacman. Packages that only exist in
 # the AUR are installed through yay/paru (or the helper named by AUR_HELPER).
-# jphide, jpseek and stegdetect are not packaged in the official repos or the
-# AUR and are listed as manual/optional tools.
+# jphide and jpseek are not packaged anywhere in Arch, AUR or BlackArch and
+# remain manual tools. stegdetect and stegsolve are available from BlackArch;
+# run scripts/install-blackarch-tools.sh to add that repository.
 #
 # Usage:
 #   ./scripts/install-arch-tools.sh
 #   ./scripts/install-arch-tools.sh --dry-run
 #   ./scripts/install-arch-tools.sh --no-aur
 #   AUR_HELPER=paru ./scripts/install-arch-tools.sh
+#   ./scripts/install-blackarch-tools.sh
 
 set -euo pipefail
 
@@ -49,7 +51,6 @@ AUR_PACKAGES=(
 UNPACKAGED_TOOLS=(
   jphide
   jpseek
-  stegdetect
 )
 
 usage() {
@@ -147,8 +148,11 @@ else
   log "Skipping AUR packages (--no-aur)"
 fi
 
-log "Unavailable/manual tools (not packaged in Arch repos or the AUR)"
+log "Unavailable in the official repos or AUR"
 printf '  %s\n' "${UNPACKAGED_TOOLS[@]}"
+printf '  stegdetect and stegsolve are available from BlackArch:\n'
+printf '    ./scripts/install-blackarch-tools.sh\n'
+printf '  jphide and jpseek are not packaged and must be built manually.\n'
 
 printf '\n'
 if command -v nvox >/dev/null 2>&1; then

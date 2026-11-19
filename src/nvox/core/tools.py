@@ -201,6 +201,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "M6",
         "nixpkgs#ffmpeg",
         ("-version",),
+        bridges=("bridge.ffprobe",),
     ),
     _tool(
         "sox",
@@ -210,6 +211,7 @@ TOOLS: tuple[ExternalTool, ...] = (
         "M6",
         "nixpkgs#sox",
         ("--version",),
+        bridges=("bridge.sox",),
     ),
     _tool(
         "mediainfo",

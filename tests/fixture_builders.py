@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import base64
 import binascii
+import gzip
+import io
+import math
 import struct
+import tarfile
+import wave
+import zipfile
 import zlib
 
 
@@ -460,3 +466,397 @@ def make_zip(name: str = "secret.txt", data: bytes = b"payload") -> bytes:
 def raw_deflate(data: bytes) -> bytes:
     compressor = zlib.compressobj(wbits=-15)
     return compressor.compress(data) + compressor.flush()
+
+
+def _pcm_frames(samples: list[int], *, sample_width: int = 2) -> bytes:
+    output = bytearray()
+    for sample in samples:
+        if sample_width == 1:
+            output.append(sample & 0xFF)
+        elif sample_width == 2:
+            output += struct.pack("<h", max(-32768, min(32767, sample)))
+        elif sample_width == 3:
+            value = max(-(1 << 23), min((1 << 23) - 1, sample))
+            output += value.to_bytes(3, "little", signed=True)
+        elif sample_width == 4:
+            output += struct.pack("<i", max(-(1 << 31), min((1 << 31) - 1, sample)))
+        else:
+            raise ValueError("sample_width must be 1, 2, 3 or 4")
+    return bytes(output)
+
+
+def make_wav(
+    samples: list[int],
+    *,
+    sample_rate: int = 8000,
+    sample_width: int = 2,
+    channels: int = 1,
+    trailing: bytes = b"",
+) -> bytes:
+    """Build a PCM WAV with optional bytes after the RIFF container."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as handle:
+        handle.setnchannels(channels)
+        handle.setsampwidth(sample_width)
+        handle.setframerate(sample_rate)
+        handle.writeframes(_pcm_frames(samples, sample_width=sample_width))
+    return buffer.getvalue() + trailing
+
+
+def make_wav_lsb(
+    text: str,
+    *,
+    sample_rate: int = 8000,
+    sample_width: int = 2,
+    bit: int = 1,
+    base_value: int = 4096,
+) -> bytes:
+    """Embed UTF-8 text in the selected PCM sample bit (LSB by default)."""
+    bits = [(byte >> shift) & 1 for byte in text.encode() for shift in range(7, -1, -1)]
+    mask = 1 << (bit - 1)
+    samples = [(base_value & ~mask) | (value << (bit - 1)) for value in bits]
+    samples.extend([base_value & ~mask] * 16)
+    return make_wav(samples, sample_rate=sample_rate, sample_width=sample_width)
+
+
+def make_dtmf_wav(
+    sequence: str,
+    *,
+    sample_rate: int = 8000,
+    tone_seconds: float = 0.08,
+    gap_seconds: float = 0.04,
+    amplitude: float = 0.2,
+) -> bytes:
+    """Build a WAV containing a DTMF key sequence."""
+    rows = {
+        "1": 697,
+        "2": 697,
+        "3": 697,
+        "A": 697,
+        "4": 770,
+        "5": 770,
+        "6": 770,
+        "B": 770,
+        "7": 852,
+        "8": 852,
+        "9": 852,
+        "C": 852,
+        "*": 941,
+        "0": 941,
+        "#": 941,
+        "D": 941,
+    }
+    columns = {
+        "1": 1209,
+        "2": 1336,
+        "3": 1477,
+        "A": 1633,
+        "4": 1209,
+        "5": 1336,
+        "6": 1477,
+        "B": 1633,
+        "7": 1209,
+        "8": 1336,
+        "9": 1477,
+        "C": 1633,
+        "*": 1209,
+        "0": 1336,
+        "#": 1477,
+        "D": 1633,
+    }
+    samples: list[int] = []
+    for key in sequence:
+        low = rows[key]
+        high = columns[key]
+        count = int(sample_rate * tone_seconds)
+        for index in range(count):
+            time = index / sample_rate
+            value = math.sin(2 * math.pi * low * time) + math.sin(2 * math.pi * high * time)
+            samples.append(int(value * amplitude * 32767 / 2))
+        samples.extend([0] * int(sample_rate * gap_seconds))
+    return make_wav(samples, sample_rate=sample_rate)
+
+
+_MORSE_LETTERS = {
+    "A": ".-",
+    "B": "-...",
+    "C": "-.-.",
+    "D": "-..",
+    "E": ".",
+    "F": "..-.",
+    "G": "--.",
+    "H": "....",
+    "I": "..",
+    "J": ".---",
+    "K": "-.-",
+    "L": ".-..",
+    "M": "--",
+    "N": "-.",
+    "O": "---",
+    "P": ".--.",
+    "Q": "--.-",
+    "R": ".-.",
+    "S": "...",
+    "T": "-",
+    "U": "..-",
+    "V": "...-",
+    "W": ".--",
+    "X": "-..-",
+    "Y": "-.--",
+    "Z": "--..",
+    "0": "-----",
+    "1": ".----",
+    "2": "..---",
+    "3": "...--",
+    "4": "....-",
+    "5": ".....",
+    "6": "-....",
+    "7": "--...",
+    "8": "---..",
+    "9": "----.",
+}
+
+
+def make_morse_wav(
+    message: str,
+    *,
+    sample_rate: int = 8000,
+    frequency: float = 700.0,
+    unit_seconds: float = 0.06,
+    amplitude: float = 0.4,
+) -> bytes:
+    """Build an on/off-keyed Morse WAV for a message containing A-Z, 0-9 and spaces."""
+    samples: list[int] = []
+
+    def silence(seconds: float) -> None:
+        samples.extend([0] * int(sample_rate * seconds))
+
+    def tone(seconds: float) -> None:
+        count = int(sample_rate * seconds)
+        for index in range(count):
+            value = math.sin(2 * math.pi * frequency * index / sample_rate)
+            samples.append(int(value * amplitude * 32767))
+
+    for char_index, char in enumerate(message.upper()):
+        if char == " ":
+            silence(unit_seconds * 7)
+            continue
+        pattern = _MORSE_LETTERS.get(char)
+        if pattern is None:
+            continue
+        for symbol_index, symbol in enumerate(pattern):
+            tone(unit_seconds * (3 if symbol == "-" else 1))
+            if symbol_index + 1 < len(pattern):
+                silence(unit_seconds)
+        if char_index + 1 < len(message):
+            silence(unit_seconds * 3)
+    silence(unit_seconds * 3)
+    return make_wav(samples, sample_rate=sample_rate)
+
+
+def _syncsafe(value: int) -> bytes:
+    return bytes(((value >> 21) & 0x7F, (value >> 14) & 0x7F, (value >> 7) & 0x7F, value & 0x7F))
+
+
+def _id3_text_frame(frame_id: str, value: str) -> bytes:
+    payload = b"\x00" + value.encode("latin-1", errors="replace")
+    return frame_id.encode() + len(payload).to_bytes(4, "big") + b"\x00\x00" + payload
+
+
+def make_mp3(
+    *,
+    title: str = "",
+    artist: str = "",
+    album: str = "",
+    comment: str = "",
+    frames: int = 2,
+    garbage: bytes = b"",
+    trailing: bytes = b"",
+) -> bytes:
+    """Build an ID3v2.3 MP3 with valid MPEG1 Layer III frame headers."""
+    body = b""
+    if title:
+        body += _id3_text_frame("TIT2", title)
+    if artist:
+        body += _id3_text_frame("TPE1", artist)
+    if album:
+        body += _id3_text_frame("TALB", album)
+    if comment:
+        body += _id3_text_frame("COMM", "eng\x00" + comment)
+    tag = b"ID3\x03\x00\x00" + _syncsafe(len(body)) + body
+    header = b"\xff\xfb\x90\x00"  # MPEG1 Layer III, 128 kbps, 44.1 kHz, stereo.
+    frame_length = 417
+    audio = b""
+    for index in range(max(0, frames)):
+        audio += header + bytes(frame_length - len(header))
+        if garbage and index + 1 < frames:
+            audio += garbage
+    return tag + audio + trailing
+
+
+def make_zip_entries(
+    entries: list[tuple[str, bytes]],
+    *,
+    compression: int = zipfile.ZIP_DEFLATED,
+) -> bytes:
+    """Build a ZIP archive from ``(name, payload)`` pairs."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=compression) as archive:
+        for name, data in entries:
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+def make_tar(entries: list[tuple[str, bytes]]) -> bytes:
+    """Build an uncompressed tar archive from ``(name, payload)`` pairs."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        for name, data in entries:
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+def make_gzip(data: bytes) -> bytes:
+    return gzip.compress(data, mtime=0)
+
+
+def _pdf_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def make_pdf(
+    *,
+    text: str = "",
+    title: str = "",
+    author: str = "",
+    producer: str = "",
+    compress: bool = False,
+    javascript: bool = False,
+    embedded: bool = False,
+    trailing: bytes = b"",
+) -> bytes:
+    """Build a small but structurally valid PDF with optional actions."""
+    content = b"BT /F1 12 Tf 72 720 Td (" + _pdf_escape(text).encode() + b") Tj ET"
+    if compress:
+        stream = zlib.compress(content)
+        stream_dict = f"<< /Length {len(stream)} /Filter /FlateDecode >>"
+    else:
+        stream = content
+        stream_dict = f"<< /Length {len(stream)} >>"
+    actions = ""
+    if javascript:
+        actions += " /OpenAction << /S /JavaScript /JS (app.alert\\('x'\\)) >>"
+    if embedded:
+        actions += " /Names << /EmbeddedFiles << /Names [(x) 6 0 R] >> >>"
+    info = (
+        "<< "
+        + " ".join(
+            f"/{key} ({_pdf_escape(value)})"
+            for key, value in (("Title", title), ("Author", author), ("Producer", producer))
+            if value
+        )
+        + " >>"
+    )
+    embedded_object = (
+        "6 0 obj\n<< /Type /Filespec /F (x.bin) /EF << /F 7 0 R >> >>\nendobj\n" if embedded else ""
+    )
+    body_objects = [
+        "<< /Type /Catalog /Pages 2 0 R" + actions + " >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>",
+        f"{stream_dict}\nstream\n".encode() + stream + b"\nendstream",
+        info,
+    ]
+    payload = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets: list[int] = []
+    for index, obj in enumerate(body_objects, start=1):
+        offsets.append(len(payload))
+        encoded_obj = obj if isinstance(obj, bytes) else obj.encode()
+        payload += f"{index} 0 obj\n".encode() + encoded_obj + b"\nendobj\n"
+    if embedded:
+        embedded_offset = len(payload)
+        payload += embedded_object.encode()
+        stream_offset = len(payload)
+        payload += b"7 0 obj\n<< /Length 4 >>\nstream\nctf{}\nendstream\nendobj\n"
+        _ = embedded_offset, stream_offset
+    xref_offset = len(payload)
+    payload += f"xref\n0 {len(body_objects) + 1}\n".encode()
+    payload += b"0000000000 65535 f \n"
+    for offset in offsets:
+        payload += f"{offset:010d} 00000 n \n".encode()
+    payload += (
+        f"trailer\n<< /Size {len(body_objects) + 1} /Root 1 0 R /Info 5 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n"
+    ).encode()
+    return bytes(payload) + trailing
+
+
+def make_docx(
+    *,
+    title: str = "",
+    creator: str = "",
+    company: str = "",
+    application: str = "Nvox Fixture",
+    macros: bool = False,
+    external_link: str = "",
+) -> bytes:
+    """Build a minimal DOCX OOXML package with optional macro and external link."""
+    core = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<cp:coreProperties "
+        'xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/">'
+        + (f"<dc:title>{title}</dc:title>" if title else "")
+        + (f"<dc:creator>{creator}</dc:creator>" if creator else "")
+        + "</cp:coreProperties>"
+    )
+    app = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Properties "
+        'xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
+        + (f"<Company>{company}</Company>" if company else "")
+        + f"<Application>{application}</Application></Properties>"
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        "<Relationships "
+        'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+        'officeDocument" Target="word/document.xml"/>'
+        "</Relationships>"
+    )
+    entries = [
+        ("[Content_Types].xml", b'<?xml version="1.0"?><Types/>'),
+        ("_rels/.rels", rels.encode()),
+        (
+            "word/document.xml",
+            (
+                b'<?xml version="1.0"?>'
+                b'<w:document xmlns:w="http://schemas.openxmlformats.org/'
+                b'wordprocessingml/2006/main"><w:body/></w:document>'
+            ),
+        ),
+        ("docProps/core.xml", core.encode()),
+        ("docProps/app.xml", app.encode()),
+    ]
+    if macros:
+        entries.append(("word/vbaProject.bin", b"macro fixture"))
+    if external_link:
+        entries.append(
+            (
+                "word/_rels/document.xml.rels",
+                (
+                    '<?xml version="1.0" encoding="UTF-8"?>'
+                    "<Relationships "
+                    'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    '<Relationship Id="rId9" '
+                    'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+                    f'hyperlink" Target="{external_link}" TargetMode="External"/>'
+                    "</Relationships>"
+                ).encode(),
+            )
+        )
+    return make_zip_entries(entries)

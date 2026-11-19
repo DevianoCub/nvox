@@ -13,20 +13,25 @@ nvox scan photo.png --flag-format 'ctf{}'
 ## Status
 
 Early development. **M0 (bootstrap)**, **M1 (core engine)**, **M2 (flag
-engine)**, **M3 (deep image analysis)** and **M4 (UX)** are complete;
-**M5 (external bridges and plugin hardening)** is implemented and pending
-acceptance. Nvox provides configuration, `nvox doctor`, evidence ingestion, the
-artifact store, plugin discovery, the scheduler/hook engine, `nvox scan`,
-`nvox plugins`, `nvox extract`, `nvox report` and `nvox tui`. The built-in
-decoder chain covers base encodings, common compression and XOR brute force.
-The image pack parses PNG/JPEG/GIF/BMP/TIFF metadata and structure, extracts
-configurable PNG bit planes, analyses palette/alpha/channel anomalies, carves
-embedded containers and decodes raw DEFLATE. Optional bridges add ExifTool,
-pngcheck, zsteg, steghide, stegseek, outguess, StegSolve, binwalk, foremost,
-zbar and tesseract; missing tools become recorded skips. Scans write a
-self-contained HTML report; the Textual TUI supports artifact triage with plugin
-toggles. Audio lands in M6; see the [roadmap](docs/roadmap.md),
-[image analysis coverage](docs/image-analysis.md) and
+engine)**, **M3 (deep image analysis)**, **M4 (UX)** and **M5 (external bridges
+and plugin hardening)** are complete; **M6 (audio and generic file analysis)**
+is implemented and pending acceptance. Nvox provides configuration,
+`nvox doctor`, evidence ingestion, the artifact store, plugin discovery, the
+scheduler/hook engine, `nvox scan`, `nvox plugins`, `nvox extract`, `nvox report`
+and `nvox tui`. The built-in decoder chain covers base encodings, common
+compression and XOR brute force. The image pack parses PNG/JPEG/GIF/BMP/TIFF
+metadata and structure, extracts configurable PNG bit planes, analyses
+palette/alpha/channel anomalies, carves embedded containers and decodes raw
+DEFLATE. The audio pack parses WAV/MP3 metadata, extracts sample bit planes,
+renders spectrograms and decodes DTMF/Morse hints. The generic pack adds entropy
+maps, recursive ZIP/TAR/compression extraction, PDF and OOXML inspection.
+Optional bridges add ExifTool, pngcheck, zsteg, steghide, stegseek, outguess,
+StegSolve, binwalk, foremost, zbar, tesseract, ffprobe and SoX; missing tools
+become recorded skips. Scans write a self-contained HTML report; the Textual TUI
+supports artifact triage with plugin toggles. See the [roadmap](docs/roadmap.md),
+[image analysis coverage](docs/image-analysis.md),
+[audio analysis](docs/audio-analysis.md),
+[generic file analysis](docs/generic-analysis.md) and
 [HTML/TUI guide](docs/report.md).
 
 ## Why it is modular
@@ -91,6 +96,10 @@ nvox scan photo.png --no-html --out out/         # skip the HTML report
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./dump --flag 'flag\{[^}]+\}' -i --depth 4
 nvox scan challenge.bin --flag-format 'htb{}' --json --out out/
+nvox scan challenge.wav --flag-format 'ctf{}' --out out/   # WAV LSB, tones, spectrogram
+nvox scan song.mp3 --flag-format 'pico{}' --no-external     # ID3 and MPEG frames
+nvox scan bundle.zip --flag-format 'ctf{}' --out out/       # recursive archives
+nvox scan challenge.pdf --flag-format 'htb{}' --out out/    # PDF structure and text
 nvox report out/                                 # re-render HTML without rescanning
 nvox report out/ --open                          # open the report in a browser
 nvox tui --report out/                           # Textual artifact browser
@@ -122,7 +131,10 @@ See [docs/cli.md](docs/cli.md) for the full interface,
 [docs/report.md](docs/report.md) for HTML/TUI triage,
 [docs/plugins.md](docs/plugins.md) for writing plugins,
 [docs/image-analysis.md](docs/image-analysis.md) for the M3 technique coverage
-and limitations, and [docs/tooling.md](docs/tooling.md) for optional tools.
+and limitations, [docs/audio-analysis.md](docs/audio-analysis.md) for the M6
+audio pack, [docs/generic-analysis.md](docs/generic-analysis.md) for entropy,
+archives, PDF and Office, and [docs/tooling.md](docs/tooling.md) for optional
+tools.
 
 ## Documentation
 
@@ -139,8 +151,8 @@ intentionally empty for now.
 | M2 | Flag engine: formats, decoders, XOR brute, provenance (done) |
 | M3 | Deep image analysis and steganography (done) |
 | M4 | CLI polish, HTML report, TUI (done) |
-| M5 | External tool bridges, declarative plugin hardening (implemented; pending acceptance) |
-| M6 | Audio and generic file analysis (next) |
+| M5 | External tool bridges, declarative plugin hardening (done) |
+| M6 | Audio and generic file analysis (implemented; pending acceptance) |
 | M7 | Hardening, docs, 0.1 release |
 
 ## Legal

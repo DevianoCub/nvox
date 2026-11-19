@@ -22,6 +22,8 @@ nav:
   - Plugins: plugins.md
   - Flag engine: flag-engine.md
   - Image analysis: image-analysis.md
+  - Audio analysis: audio-analysis.md
+  - Generic file analysis: generic-analysis.md
   - HTML reports and TUI: report.md
   - Tooling setup: tooling.md
   - Forensics: forensics.md

@@ -113,10 +113,11 @@ verify that the artifact pipeline still completes.
 
 ## M6 — Audio and generic files
 
-- [ ] Audio metadata (ID3, ffprobe), WAV sample LSB, MP3 frame anomalies
-- [ ] Spectrogram rendering, optional OCR of spectrogram text
-- [ ] DTMF and Morse hints, echo-hiding heuristics, sox bridge
-- [ ] Generic: entropy map, strings (multiple encodings), magic carving,
+- [x] Audio metadata (ID3, ffprobe), WAV sample LSB, MP3 frame anomalies
+- [x] Spectrogram rendering, optional OCR of spectrogram text through the
+      existing image/OCR bridge pipeline
+- [x] DTMF and Morse hints, echo-hiding heuristics, sox bridge
+- [x] Generic: entropy map, strings (multiple encodings), magic carving,
       archive recursion, PDF and Office basics
 
 Acceptance: audio fixtures and recursive archive fixtures pass; audio pack

@@ -133,8 +133,9 @@ nvox tui --report out/                           # interactive artifact browser
 The report is written to `out/findings.json` and `out/report.html`; with a flag
 format the command exits with code `2` when it finds a flag. `nvox extract
 <sha256>` reproduces any artifact from the store. Image technique coverage is in
-[Image analysis](image-analysis.md), HTML/TUI usage is in
-[HTML reports and TUI](report.md), and optional tool setup is in
+[Image analysis](image-analysis.md), [Audio analysis](audio-analysis.md),
+[Generic file analysis](generic-analysis.md), HTML/TUI usage in
+[HTML reports and TUI](report.md), and optional tool setup in
 [Tooling setup](tooling.md). M5 adds optional external bridges and a hardened
-command-plugin sandbox; audio arrives in M6. See the [roadmap](roadmap.md) for
-the order of work.
+command-plugin sandbox; M6 adds the audio and generic packs. See the
+[roadmap](roadmap.md) for the order of work.

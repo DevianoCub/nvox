@@ -15,6 +15,8 @@ from nvox.core.config import Config
 from nvox.core.doctor import collect
 from nvox.core.engine import Engine
 from nvox.core.registry import PluginRegistry
+from nvox.plugins.bridges import stego as stego_module
+from nvox.plugins.bridges.audio import FfprobeBridge, SoxBridge
 from nvox.plugins.bridges.carving import BinwalkBridge, ForemostBridge
 from nvox.plugins.bridges.metadata import ExiftoolBridge
 from nvox.plugins.bridges.ocr import TesseractBridge, ZbarBridge
@@ -51,7 +53,14 @@ def _context(
     name: str = "sample.png",
     options: dict[str, object] | None = None,
 ) -> Context:
-    kind = ArtifactKind.IMAGE if media_type.startswith("image/") else ArtifactKind.BYTES
+    if media_type.startswith("image/"):
+        kind = ArtifactKind.IMAGE
+    elif media_type.startswith("audio/"):
+        kind = ArtifactKind.AUDIO
+    elif media_type in {"application/zip", "application/gzip"}:
+        kind = ArtifactKind.ARCHIVE
+    else:
+        kind = ArtifactKind.BYTES
     artifact = make_artifact(kind=kind, name=name, payload=payload, media_type=media_type)
     return Context(
         artifact,
@@ -81,6 +90,8 @@ def test_bridge_plugins_are_discovered_by_the_registry() -> None:
         "bridge.stegsolve",
         "bridge.zbar",
         "bridge.tesseract",
+        "bridge.ffprobe",
+        "bridge.sox",
     } <= {record.name for record in registry.records}
 
 
@@ -89,6 +100,8 @@ def test_doctor_reports_bridge_names() -> None:
     tools = {tool["name"]: tool for tool in report["tools"]}
     assert tools["zsteg"]["bridges"] == ["bridge.zsteg"]
     assert tools["StegSolve"]["bridges"] == ["bridge.stegsolve"]
+    assert tools["ffprobe"]["bridges"] == ["bridge.ffprobe"]
+    assert tools["sox"]["bridges"] == ["bridge.sox"]
     assert tools["file"]["bridges"] == []
 
 
@@ -109,6 +122,73 @@ def test_exiftool_bridge_emits_json_metadata(
     _run(plugin, ctx)
     assert ctx.artifacts[0].kind is ArtifactKind.META
     assert "ctf{meta}" in ctx.artifacts[0].text
+
+
+def test_ffprobe_bridge_emits_json_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_tool(
+        monkeypatch,
+        tmp_path,
+        "ffprobe",
+        """
+        import json, sys
+        print(json.dumps({
+            "format": {"format_name": "wav", "duration": "1.0"},
+            "streams": [{"codec_type": "audio", "sample_rate": "8000"}],
+            "input": sys.argv[-1],
+        }))
+        """,
+    )
+    plugin = FfprobeBridge()
+    ctx = _context(plugin, media_type="audio/wav", name="sample.wav")
+    _run(plugin, ctx)
+    assert ctx.artifacts[0].kind is ArtifactKind.META
+    assert '"format_name": "wav"' in ctx.artifacts[0].text
+
+
+def test_ffprobe_bridge_rejects_invalid_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_tool(monkeypatch, tmp_path, "ffprobe", "print('not json')")
+    plugin = FfprobeBridge()
+    ctx = _context(plugin, media_type="audio/wav", name="sample.wav")
+    with pytest.raises(PluginSkip, match="invalid JSON"):
+        _run(plugin, ctx)
+
+
+def test_sox_bridge_emits_stat_report(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _install_tool(
+        monkeypatch,
+        tmp_path,
+        "sox",
+        """
+        import sys
+        print("Samples read: 8000")
+        print("Maximum amplitude: 0.5")
+        print("sox ", " ".join(sys.argv[1:]))
+        """,
+    )
+    plugin = SoxBridge()
+    ctx = _context(plugin, media_type="audio/wav", name="sample.wav")
+    _run(plugin, ctx)
+    assert ctx.artifacts[0].name == "sox/report"
+    assert "Samples read: 8000" in ctx.artifacts[0].text
+    assert "-n stat" in ctx.artifacts[0].text
+
+
+def test_sox_bridge_info_mode_and_invalid_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_tool(monkeypatch, tmp_path, "sox", "import sys; print(' '.join(sys.argv[1:]))")
+    plugin = SoxBridge()
+    ctx = _context(plugin, media_type="audio/wav", name="sample.wav", options={"mode": "info"})
+    _run(plugin, ctx)
+    assert "--i" in ctx.artifacts[0].text
+
+    ctx = _context(plugin, media_type="audio/wav", name="sample.wav", options={"mode": "raw"})
+    with pytest.raises(PluginSkip, match="mode must be"):
+        _run(plugin, ctx)
 
 
 def test_pngcheck_bridge_emits_report(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -182,9 +262,10 @@ def test_stegseek_bridge_requires_and_uses_wordlist(
     plugin = StegseekBridge()
     ctx = _context(plugin, options={"wordlist": str(wordlist)})
 
+    monkeypatch.setattr(stego_module, "default_wordlist", lambda: None)
     missing = StegseekBridge()
     missing_ctx = _context(missing)
-    with pytest.raises(PluginSkip, match="wordlist"):
+    with pytest.raises(PluginSkip, match="install-wordlist"):
         _run(missing, missing_ctx)
 
     _run(plugin, ctx)
@@ -197,6 +278,41 @@ def test_stegseek_bridge_requires_and_uses_wordlist(
     relative_ctx = _context(relative, options={"wordlist": "words.txt"})
     _run(relative, relative_ctx)
     assert "stegseek/stegseek.out" in {artifact.name for artifact in relative_ctx.artifacts}
+
+
+def test_default_wordlist_uses_xdg_data_home(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
+    wordlist = tmp_path / "nvox" / "wordlists" / "rockyou.txt"
+    wordlist.parent.mkdir(parents=True)
+    wordlist.write_text("password\n", encoding="utf-8")
+    assert stego_module.default_wordlist() == wordlist
+
+
+def test_stegseek_auto_detects_wordlist(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _install_tool(
+        monkeypatch,
+        tmp_path,
+        "stegseek",
+        """
+        import sys
+        from pathlib import Path
+        if not Path(sys.argv[-1]).is_file():
+            raise SystemExit(2)
+        output = Path(sys.argv[sys.argv.index("-o") + 1])
+        output.write_bytes(b"ctf{auto_wordlist}")
+        print("Found passphrase")
+        """,
+    )
+    wordlist = tmp_path / "auto-words.txt"
+    wordlist.write_text("password\n", encoding="utf-8")
+    monkeypatch.setattr(stego_module, "default_wordlist", lambda: wordlist)
+
+    plugin = StegseekBridge()
+    ctx = _context(plugin, media_type="image/jpeg", name="sample.jpg")
+    _run(plugin, ctx)
+    assert any(artifact.name.endswith("stegseek.out") for artifact in ctx.artifacts)
 
 
 def test_outguess_bridge_extracts_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

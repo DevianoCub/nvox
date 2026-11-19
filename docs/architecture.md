@@ -155,8 +155,7 @@ accelerators, not as the definition of a feature.
 
 ## Extension points
 
-1. Built-in plugin packs: `src/nvox/plugins/{generic,decoders,image,bridges}`
-   today; `audio` is planned for M6.
+1. Built-in plugin packs: `src/nvox/plugins/{generic,decoders,image,audio,bridges}`.
 2. Local plugin directories: `./plugins`, `~/.config/nvox/plugins`.
 3. Installed packages exposing the `nvox.plugins` entry point.
 4. Declarative TOML plugins wrapping any command.

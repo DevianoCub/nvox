@@ -1,11 +1,13 @@
 # Plugins
 
-> **Status:** implemented through M5. The stable import surface is `nvox.api`
+> **Status:** implemented through M6. The stable import surface is `nvox.api`
 > (`API_VERSION = 1`). The built-in image pack covers PNG/JPEG/GIF/BMP/TIFF
 > metadata and structure, configurable bit planes, channel analysis, carving and
-> DEFLATE. Command plugins and external bridges run in bounded subprocesses;
-> optional process isolation for Python plugins is planned for M7. Audio arrives
-> in M6.
+> DEFLATE. The audio pack covers WAV/MP3 metadata, sample LSB, spectrograms,
+> DTMF/Morse and echo hints. The generic pack adds entropy maps, recursive
+> archives, PDF and Office inspection. Command plugins and external bridges run
+> in bounded subprocesses; optional process isolation for Python plugins is
+> planned for M7.
 
 Everything that analyses, extracts or decodes is a plugin. The core provides
 evidence handling, the artifact store, scheduling, flag scanning and reporting;
@@ -27,13 +29,17 @@ scanner searches them with full provenance.
 
 | Pack | Plugins | Milestone |
 |---|---|---|
-| `generic` | `generic.strings` (ASCII + UTF-16LE/BE runs), `generic.carve` (embedded containers) | M1-M3 |
+| `generic` | `generic.strings` (ASCII + UTF-16LE/BE + UTF-32LE/BE runs), `generic.carve` (embedded containers), `generic.entropy` (sliding-window map), `generic.archive` (recursive ZIP/TAR/gzip/bzip2/xz), `generic.pdf`, `generic.office` | M1-M6 |
 | `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `deflate`, `xor` | M2-M3 |
 | `image` | `image.structure`, `image.png_chunks`, `image.jpeg`, `image.exif`, `image.gif`, `image.bmp`, `image.tiff`, `image.channels`, `image.lsb` | M2-M3 |
-| `bridges` | `bridge.exiftool`, `bridge.pngcheck`, `bridge.zsteg`, `bridge.steghide`, `bridge.stegseek`, `bridge.outguess`, `bridge.stegsolve`, `bridge.binwalk`, `bridge.foremost`, `bridge.zbar`, `bridge.tesseract` | M5 |
+| `audio` | `audio.wav`, `audio.wav_lsb`, `audio.id3`, `audio.mp3_frames`, `audio.spectrogram`, `audio.tones`, `audio.echo` | M6 |
+| `bridges` | `bridge.exiftool`, `bridge.pngcheck`, `bridge.zsteg`, `bridge.steghide`, `bridge.stegseek`, `bridge.outguess`, `bridge.stegsolve`, `bridge.binwalk`, `bridge.foremost`, `bridge.zbar`, `bridge.tesseract`, `bridge.ffprobe`, `bridge.sox` | M5-M6 |
 
 The image pack is documented in detail, with options and limitations, in
-[Image analysis](image-analysis.md).
+[Image analysis](image-analysis.md). Audio techniques are in
+[Audio analysis](audio-analysis.md); entropy, archives, PDF and Office are in
+[Generic file analysis](generic-analysis.md). The audio pack uses the same
+`Analyzer` contract, artifact kinds and bridge rules as the image pack.
 
 The decoder pack is intentionally conservative: base encodings must validate
 and produce meaningful text/magic, compression is magic-gated, and XOR keeps
@@ -60,6 +66,8 @@ reproducible built-in-only run.
 | `bridge.foremost` | `foremost` | Generic non-text artifacts | Carved files |
 | `bridge.zbar` | `zbarimg` | Images | Decoded QR/barcode text |
 | `bridge.tesseract` | `tesseract` | Images | OCR text |
+| `bridge.ffprobe` | `ffprobe` | Audio, video | Stream/container metadata as JSON |
+| `bridge.sox` | `sox` | Audio | SoX `stat` or `--i` report |
 
 Bridge options live under `[plugins.options."bridge.<tool>"]`:
 
@@ -82,6 +90,9 @@ extract = false
 [plugins.options."bridge.tesseract"]
 lang = "eng"
 psm = 6
+
+[plugins.options."bridge.sox"]
+mode = "stat"              # "stat" or "info"
 
 [plugins.options."bridge.stegsolve"]
 # jar = "/opt/Stegsolve.jar"

@@ -39,10 +39,35 @@ disable = []
 # max_pixels = 2000000
 # channels = "all"   # or a channel list/CSV, e.g. "1" or [0, 1, 2]
 
+# Audio extraction and rendering limits.
+# [plugins.options."audio.wav_lsb"]
+# bit = 1
+# channels = "all"
+# order = "msb"
+# [plugins.options."audio.spectrogram"]
+# fft_size = 2048
+# hop = 512
+# max_seconds = 60
+# [plugins.options."audio.echo"]
+# min_lag = 20
+# max_lag = 500
+# threshold = 0.3
+
+# Archive recursion and parser budgets for untrusted files.
+# [plugins.options."generic.archive"]
+# max_entries = 128
+# max_file_bytes = 8388608
+# max_total_bytes = 33554432
+# max_ratio = 200
+# [plugins.options."generic.pdf"]
+# max_stream_bytes = 4194304
+
 # Optional external bridge options. Each bridge is skipped when its binary is
-# missing; stegseek additionally needs a wordlist to run.
+# missing; stegseek additionally needs a wordlist to run. The wordlist is
+# auto-detected from ~/.local/share/nvox/wordlists/rockyou.txt and common
+# /usr/share wordlist locations; scripts/install-wordlist.sh downloads it.
 # [plugins.options."bridge.stegseek"]
-# wordlist = "/usr/share/wordlists/rockyou.txt"
+# wordlist = "~/.local/share/nvox/wordlists/rockyou.txt"
 # [plugins.options."bridge.steghide"]
 # passphrase = ""
 # [plugins.options."bridge.outguess"]
@@ -52,6 +77,8 @@ disable = []
 # [plugins.options."bridge.tesseract"]
 # lang = "eng"
 # psm = 6
+# [plugins.options."bridge.sox"]
+# mode = "stat"   # "stat" or "info"
 # [plugins.options."bridge.stegsolve"]
 # jar = "/opt/Stegsolve.jar"
 # command = ["/path/to/headless-stegsolve", "{input}", "{outdir}"]

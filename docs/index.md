@@ -41,7 +41,7 @@ Nvox is under active development.
 | M3 | Deep image analysis and steganography | done |
 | M4 | CLI polish, HTML report, TUI | done |
 | M5 | External tool bridges, declarative plugin hardening | implemented; pending acceptance |
-| M6 | Audio and generic file analysis | next |
+| M6 | Audio and generic file analysis | implemented; pending acceptance |
 | M7 | Hardening, docs, 0.1 release | planned |
 
 Working commands today: `nvox scan`, `nvox doctor`,
@@ -54,9 +54,12 @@ HTML instead of printing everything in the terminal. M4 adds live progress,
 grouped findings, a self-contained HTML report and a Textual triage interface.
 M5 adds optional bridges for ExifTool, pngcheck, zsteg, steghide, stegseek,
 outguess, StegSolve, binwalk, foremost, zbar and tesseract, plus a hardened
-command-plugin sandbox. Missing tools are recorded as skips and never abort a
-scan. Everything documented as "planned" describes the target design and is not
-implemented yet; each page marks its status explicitly.
+command-plugin sandbox. M6 adds the audio pack (WAV/MP3 metadata, sample LSB,
+spectrograms, DTMF/Morse, echo hints) and generic analysis (entropy maps,
+recursive archives, PDF and Office), with optional ffprobe and SoX bridges.
+Missing tools are recorded as skips and never abort a scan. Everything
+documented as "planned" describes the target design and is not implemented yet;
+each page marks its status explicitly.
 
 ## Documentation
 
@@ -65,6 +68,8 @@ implemented yet; each page marks its status explicitly.
 - [CLI reference](cli.md)
 - [Plugins](plugins.md)
 - [Image analysis](image-analysis.md)
+- [Audio analysis](audio-analysis.md)
+- [Generic file analysis](generic-analysis.md)
 - [HTML reports and TUI](report.md)
 - [Flag engine](flag-engine.md)
 - [Tooling setup](tooling.md)

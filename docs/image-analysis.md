@@ -109,7 +109,8 @@ Run only the M3 suite:
 .venv/bin/pytest -q tests/test_image_deep.py
 ```
 
-The full suite covers 215 tests after M4.
+The full suite covers more than 280 tests, including the M6 audio and generic
+fixtures.
 
 ## Performance
 
