@@ -147,6 +147,7 @@ class ArchiveExtractor(Extractor):
                     media_type,
                     ctx,
                     max_file=max_file,
+                    max_ratio=max_ratio,
                     entries=entries,
                 )
             total = sum(int(entry.get("size", 0)) for entry in entries if entry.get("extracted"))
@@ -202,7 +203,7 @@ class ArchiveExtractor(Extractor):
                     entries.append(entry)
                     continue
                 if (
-                    info.file_size > 1024 * 1024
+                    info.file_size > 4096
                     and info.compress_size > 0
                     and info.file_size / info.compress_size > max_ratio
                 ):
@@ -217,6 +218,14 @@ class ArchiveExtractor(Extractor):
                     data = handle.read(max_file + 1)
                 if len(data) > max_file:
                     entry.update(status="skipped", reason="file exceeds max_file_bytes")
+                    entries.append(entry)
+                    continue
+                if (
+                    len(data) > 4096
+                    and info.compress_size > 0
+                    and len(data) / info.compress_size > max_ratio
+                ):
+                    entry.update(status="skipped", reason="compression ratio exceeds max_ratio")
                     entries.append(entry)
                     continue
                 params = {
@@ -282,9 +291,10 @@ class ArchiveExtractor(Extractor):
         ctx: Context,
         *,
         max_file: int,
+        max_ratio: int,
         entries: list[dict[str, Any]],
     ) -> None:
-        data = _decompress_single(payload, media_type, max_file)
+        data = _decompress_single(payload, media_type, max_file, max_ratio)
         if tarfile.is_tarfile(io.BytesIO(data)):
             _emit_entry(
                 ctx,
@@ -320,7 +330,7 @@ class ArchiveExtractor(Extractor):
         )
 
 
-def _decompress_single(payload: bytes, media_type: str, max_size: int) -> bytes:
+def _decompress_single(payload: bytes, media_type: str, max_size: int, max_ratio: int) -> bytes:
     try:
         if media_type in {"application/gzip", "application/x-gzip"}:
             decompressor = zlib.decompressobj(16 + zlib.MAX_WBITS)
@@ -335,6 +345,11 @@ def _decompress_single(payload: bytes, media_type: str, max_size: int) -> bytes:
         raise ArchiveError(f"cannot decompress {media_type}: {exc}") from exc
     if len(data) > max_size:
         raise ArchiveError(f"decompressed data exceeds max_file_bytes ({max_size})")
+    if len(data) > max(1024, len(payload) * max_ratio):
+        raise ArchiveError(
+            f"decompression ratio exceeds max_ratio ({max_ratio}); "
+            f"{len(payload)} bytes expanded to {len(data)}"
+        )
     return data
 
 

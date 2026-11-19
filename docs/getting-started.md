@@ -114,7 +114,7 @@ Do not want a tool used even when installed? Add it to `[tools].disable`.
 
 ## What's next
 
-M0-M4 are complete and M5 is implemented pending acceptance: `nvox scan` walks
+M0-M7 are complete for the 0.1.0 release: `nvox scan` walks
 the artifact graph, analyses PNG/JPEG/GIF/BMP/TIFF structure and metadata,
 extracts configurable PNG bit planes, runs the built-in decoders, optionally
 invokes external bridges and reports findings with provenance. With no flag
@@ -137,5 +137,8 @@ format the command exits with code `2` when it finds a flag. `nvox extract
 [Generic file analysis](generic-analysis.md), HTML/TUI usage in
 [HTML reports and TUI](report.md), and optional tool setup in
 [Tooling setup](tooling.md). M5 adds optional external bridges and a hardened
-command-plugin sandbox; M6 adds the audio and generic packs. See the
-[roadmap](roadmap.md) for the order of work.
+command-plugin sandbox; M6 adds the audio and generic packs; M7 adds archive
+ratio guards, malformed-input fuzzing, optional process isolation, templates
+and the 0.1 release pipeline. See [Hardening](hardening.md),
+[Performance](performance.md), [Migration](migration.md), [Release](release.md)
+and the [roadmap](roadmap.md).

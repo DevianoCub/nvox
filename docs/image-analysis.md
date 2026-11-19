@@ -155,5 +155,6 @@ Python worker.
   requirement skips. Both run on emitted image artifacts as well as the original
   evidence.
 - A cooperative timeout cannot stop a runaway Python plugin. Command plugins and
-  external bridges run in a bounded subprocess with process-group termination;
-  optional Python isolation is M7.
+  external bridges run in a bounded subprocess with process-group termination.
+  `scan.isolation = "process"` adds hard-timeout process isolation for eligible
+  Python plugins; it is not an OS sandbox. See [Hardening](hardening.md).

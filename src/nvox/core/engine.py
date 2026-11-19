@@ -27,6 +27,7 @@ from nvox.core.evidence import Evidence, EvidenceError, EvidenceTooLarge
 from nvox.core.findings import Finding, better_finding, build_chain, finding_rank
 from nvox.core.flags import FlagScanner
 from nvox.core.hooks import HookManager, HookOutcome
+from nvox.core.isolation import can_isolate, run_isolated
 from nvox.core.registry import PluginRegistry
 from nvox.core.store import ArtifactStore, ArtifactStoreError
 
@@ -233,6 +234,10 @@ class Engine:
         options: Mapping[str, Any],
         skips: list[Skip],
     ) -> tuple[Artifact, ...]:
+        if self.config.limits.isolation == "process" and can_isolate(
+            self.registry.record(plugin.name)
+        ):
+            return self._invoke_isolated(plugin, artifact, options, skips)
         timeout = self._timeout(plugin)
         ctx = Context(
             artifact,
@@ -326,6 +331,82 @@ class Engine:
             },
         )
         return ctx.artifacts
+
+    def _invoke_isolated(
+        self,
+        plugin: Plugin,
+        artifact: Artifact,
+        options: Mapping[str, Any],
+        skips: list[Skip],
+    ) -> tuple[Artifact, ...]:
+        timeout = self._timeout(plugin)
+        started = time.monotonic()
+        self._event(
+            "plugin_start",
+            {"plugin": plugin.name, "artifact": artifact.sha256, "depth": artifact.depth + 1},
+        )
+        result = run_isolated(
+            plugin_name=plugin.name,
+            artifact=artifact,
+            options=options,
+            max_artifact_bytes=self.config.limits.max_artifact_bytes,
+            depth=artifact.depth + 1,
+            timeout=timeout,
+            plugin_dirs=self.config.plugin_dirs,
+        )
+        if result.status == "timeout":
+            skips.append(
+                Skip(
+                    plugin=plugin.name,
+                    version=plugin.version,
+                    artifact=artifact.sha256,
+                    reason=result.reason,
+                    kind="timeout",
+                )
+            )
+            self._event("plugin_skip", {"plugin": plugin.name, "reason": "timeout"})
+            return ()
+        if result.status == "skip":
+            skips.append(
+                Skip(
+                    plugin=plugin.name,
+                    version=plugin.version,
+                    artifact=artifact.sha256,
+                    reason=result.reason,
+                    kind="plugin",
+                )
+            )
+            self._event(
+                "plugin_skip",
+                {"plugin": plugin.name, "reason": result.reason, "kind": "plugin"},
+            )
+            return ()
+        if result.status == "error":
+            self.log.debug("isolated plugin %s failed: %s", plugin.name, result.reason)
+            skips.append(
+                Skip(
+                    plugin=plugin.name,
+                    version=plugin.version,
+                    artifact=artifact.sha256,
+                    reason=result.reason,
+                    kind="error",
+                )
+            )
+            self._event(
+                "plugin_skip",
+                {"plugin": plugin.name, "reason": "error", "error": result.reason},
+            )
+            return ()
+        self._event(
+            "plugin_end",
+            {
+                "plugin": plugin.name,
+                "artifact": artifact.sha256,
+                "artifacts": len(result.artifacts),
+                "duration": round(time.monotonic() - started, 6),
+            },
+        )
+        return result.artifacts
 
     def _run_plugin(self, plugin: Plugin, artifact: Artifact, ctx: Context) -> None:
         result = plugin.run(artifact, ctx)

@@ -1,13 +1,13 @@
 # Plugins
 
-> **Status:** implemented through M6. The stable import surface is `nvox.api`
+> **Status:** 0.1.0. The stable import surface is `nvox.api`
 > (`API_VERSION = 1`). The built-in image pack covers PNG/JPEG/GIF/BMP/TIFF
 > metadata and structure, configurable bit planes, channel analysis, carving and
 > DEFLATE. The audio pack covers WAV/MP3 metadata, sample LSB, spectrograms,
 > DTMF/Morse and echo hints. The generic pack adds entropy maps, recursive
-> archives, PDF and Office inspection. Command plugins and external bridges run
-> in bounded subprocesses; optional process isolation for Python plugins is
-> planned for M7.
+> archives with ratio guards, PDF and Office inspection. Command plugins and
+> external bridges run in bounded subprocesses; `scan.isolation = "process"`
+> adds optional hard-timeout process isolation for eligible Python plugins.
 
 Everything that analyses, extracts or decodes is a plugin. The core provides
 evidence handling, the artifact store, scheduling, flag scanning and reporting;
@@ -197,12 +197,19 @@ SHA-256, even when produced by different plugins. A plugin should therefore
 emit derived *content*, not a byte-identical reinterpretation of its input.
 
 The engine enforces `scan.max_artifact_bytes` on every emission and checks the
-plugin deadline cooperatively. Python plugins run in worker threads, which
-cannot be force-killed; a runaway plugin is abandoned at its timeout and its
-later emissions are ignored. Command plugins and external bridges run in a
-separate process group with a hard wall-clock timeout in
-`nvox.core.sandbox`. Optional process isolation for arbitrary Python plugins is
-planned for M7.
+plugin deadline cooperatively. By default Python plugins run in worker threads:
+a runaway plugin is abandoned at its timeout and its later emissions are
+ignored, but a blocking C call cannot be interrupted. Command plugins and
+external bridges run in a separate process group with a hard wall-clock timeout
+in `nvox.core.sandbox`.
+
+Set `scan.isolation = "process"` (or pass `--isolation process`) to run
+eligible built-in, plugin-directory and entry-point Python plugins in a spawned
+child process. The parent kills the child on timeout and serialises emitted
+artifacts back with their provenance. Ad-hoc plugins registered directly on a
+registry and plugins with external requirements stay on the thread/sandbox
+runner. This is a crash/timeout containment layer, not an OS security sandbox;
+see [Hardening](hardening.md#process-isolation).
 
 Plugins must not write to the evidence or to arbitrary paths. Use the context
 to emit artifacts; the store decides where they live.
@@ -353,5 +360,15 @@ loaded with a warning.
 `src/nvox/plugins/generic/strings.py` is the reference plugin for options,
 MIME targets, `accepts` narrowing and `ctx.skip`. The image pack shows structural
 metadata analyzers (`image.png_chunks`, `image.jpeg`), bounded extraction and
-bit-plane emission; the decoder pack shows transform/gating patterns. A
-copy-paste template and a conformance test harness are part of M7.
+bit-plane emission; the decoder pack shows transform/gating patterns.
+
+Copy-paste starting points:
+
+- `examples/plugins/template.py` — Python analyzer with options, narrowed
+  `accepts`, `ctx.meta`, `ctx.text` and `ctx.skip`;
+- `examples/plugins/command-template.toml` — declarative command plugin with
+  sandbox limits.
+
+`tests/test_plugin_conformance.py` loads both templates and checks the manifest,
+provenance and skip contracts. See [Migrating to 0.1.0](migration.md) for the
+upgrade checklist.

@@ -10,7 +10,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, NoReturn, cast
 
 import typer
 from rich.console import Console
@@ -21,7 +21,7 @@ from rich.tree import Tree
 from nvox import __version__
 from nvox.api import Plugin
 from nvox.core import doctor as doctor_module
-from nvox.core.config import Config, ConfigError
+from nvox.core.config import Config, ConfigError, IsolationMode
 from nvox.core.engine import Engine, ScanResult, Skip
 from nvox.core.findings import Finding
 from nvox.core.flags import FlagFormatError, FlagScanner, build_flag_specs
@@ -295,6 +295,13 @@ def scan(
         int | None,
         typer.Option("--jobs", "-j", help="Override the worker count (0 = auto)."),
     ] = None,
+    isolation: Annotated[
+        str | None,
+        typer.Option(
+            "--isolation",
+            help="Plugin runner: 'thread' (default) or 'process' for eligible Python plugins.",
+        ),
+    ] = None,
     plugin_filter: Annotated[
         str | None,
         typer.Option(
@@ -345,6 +352,7 @@ def scan(
         depth=depth,
         timeout=timeout,
         jobs=jobs,
+        isolation=isolation,
     )
     requested_formats = list(flag_formats or ()) or list(config.flag_formats)
     requested_patterns = list(patterns or ())
@@ -589,6 +597,7 @@ def _config_with_limits(
     depth: int | None,
     timeout: float | None,
     jobs: int | None,
+    isolation: str | None = None,
 ) -> Config:
     limits = config.limits
     if depth is not None:
@@ -603,6 +612,10 @@ def _config_with_limits(
         if jobs < 0:
             _fail("--jobs must be zero or greater")
         limits = replace(limits, jobs=jobs)
+    if isolation is not None:
+        if isolation not in ("thread", "process"):
+            _fail("--isolation must be 'thread' or 'process'")
+        limits = replace(limits, isolation=cast(IsolationMode, isolation))
     return replace(config, limits=limits)
 
 

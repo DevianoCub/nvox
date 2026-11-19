@@ -12,10 +12,10 @@ nvox scan photo.png --flag-format 'ctf{}'
 
 ## Status
 
-Early development. **M0 (bootstrap)**, **M1 (core engine)**, **M2 (flag
-engine)**, **M3 (deep image analysis)**, **M4 (UX)** and **M5 (external bridges
-and plugin hardening)** are complete; **M6 (audio and generic file analysis)**
-is implemented and pending acceptance. Nvox provides configuration,
+**0.1.0** is the first tagged release. M0-M7 are complete: bootstrap, core
+engine, flag engine, deep image analysis, UX, external bridges and plugin
+hardening, audio/generic analysis, and the M7 hardening/release work. Nvox
+provides configuration,
 `nvox doctor`, evidence ingestion, the artifact store, plugin discovery, the
 scheduler/hook engine, `nvox scan`, `nvox plugins`, `nvox extract`, `nvox report`
 and `nvox tui`. The built-in decoder chain covers base encodings, common
@@ -27,12 +27,15 @@ renders spectrograms and decodes DTMF/Morse hints. The generic pack adds entropy
 maps, recursive ZIP/TAR/compression extraction, PDF and OOXML inspection.
 Optional bridges add ExifTool, pngcheck, zsteg, steghide, stegseek, outguess,
 StegSolve, binwalk, foremost, zbar, tesseract, ffprobe and SoX; missing tools
-become recorded skips. Scans write a self-contained HTML report; the Textual TUI
-supports artifact triage with plugin toggles. See the [roadmap](docs/roadmap.md),
-[image analysis coverage](docs/image-analysis.md),
+become recorded skips. Archive extraction is bounded by entry, size, total and
+compression-ratio limits, and `scan.isolation = "process"` can hard-kill an
+untrusted Python plugin on timeout. Scans write a self-contained HTML report;
+the Textual TUI supports artifact triage with plugin toggles. See the
+[roadmap](docs/roadmap.md), [image analysis coverage](docs/image-analysis.md),
 [audio analysis](docs/audio-analysis.md),
-[generic file analysis](docs/generic-analysis.md) and
-[HTML/TUI guide](docs/report.md).
+[generic file analysis](docs/generic-analysis.md),
+[hardening](docs/hardening.md),
+[performance](docs/performance.md) and [HTML/TUI guide](docs/report.md).
 
 ## Why it is modular
 
@@ -100,6 +103,7 @@ nvox scan challenge.wav --flag-format 'ctf{}' --out out/   # WAV LSB, tones, spe
 nvox scan song.mp3 --flag-format 'pico{}' --no-external     # ID3 and MPEG frames
 nvox scan bundle.zip --flag-format 'ctf{}' --out out/       # recursive archives
 nvox scan challenge.pdf --flag-format 'htb{}' --out out/    # PDF structure and text
+nvox scan untrusted.py.bin --isolation process                # hard-kill Python plugins
 nvox report out/                                 # re-render HTML without rescanning
 nvox report out/ --open                          # open the report in a browser
 nvox tui --report out/                           # Textual artifact browser
@@ -138,9 +142,11 @@ tools.
 
 ## Documentation
 
-English documentation lives in [`docs/`](docs/index.md).
-[`docs/ru/`](docs/ru/) is reserved for the Russian translation and is
-intentionally empty for now.
+English documentation lives in [`docs/`](docs/index.md). The Russian
+translation is in [`docs/ru/`](docs/ru/index.md). Hardening, performance and
+release notes are in [`docs/hardening.md`](docs/hardening.md),
+[`docs/performance.md`](docs/performance.md), [`docs/migration.md`](docs/migration.md)
+and [`docs/release.md`](docs/release.md).
 
 ## Roadmap
 
@@ -152,8 +158,8 @@ intentionally empty for now.
 | M3 | Deep image analysis and steganography (done) |
 | M4 | CLI polish, HTML report, TUI (done) |
 | M5 | External tool bridges, declarative plugin hardening (done) |
-| M6 | Audio and generic file analysis (implemented; pending acceptance) |
-| M7 | Hardening, docs, 0.1 release |
+| M6 | Audio and generic file analysis (done) |
+| M7 | Hardening, docs, 0.1 release (done) |
 
 ## Legal
 

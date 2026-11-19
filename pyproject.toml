@@ -1,6 +1,6 @@
 [project]
 name = "nvox"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Modular forensic and steganography analysis framework"
 readme = "README.md"
 requires-python = ">=3.12"

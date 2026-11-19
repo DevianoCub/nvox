@@ -87,6 +87,7 @@ def collect(config: Config, *, verbose: bool = False) -> DoctorReport:
                 "max_artifact_bytes": config.limits.max_artifact_bytes,
                 "jobs": config.limits.jobs,
                 "effective_jobs": config.limits.effective_jobs(),
+                "isolation": config.limits.isolation,
             },
             "disabled_tools": list(config.disabled_tools),
         },
@@ -127,7 +128,8 @@ def render(console: Console, report: DoctorReport) -> None:
         "limits",
         f"depth={limits['max_depth']} timeout={limits['timeout']:g}s "
         f"max_artifact={_human_bytes(limits['max_artifact_bytes'])} "
-        f"jobs={limits['jobs'] or 'auto'} (effective {limits['effective_jobs']})",
+        f"jobs={limits['jobs'] or 'auto'} (effective {limits['effective_jobs']}) "
+        f"isolation={limits['isolation']}",
     )
     for entry in cfg["plugin_dirs"]:
         state = "[green]found[/]" if entry["exists"] else "[dim]missing[/]"

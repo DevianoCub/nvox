@@ -11,6 +11,10 @@ timeout = 120
 max_artifact_bytes = 67108864
 # Worker threads; 0 means one per CPU.
 jobs = 0
+# Plugin runner. "thread" is the cooperative default. "process" runs eligible
+# Python plugins in a spawned child that is killed on timeout; ad-hoc and
+# external plugins still use the thread runner.
+isolation = "thread"
 
 [flags]
 # Flag formats. "{}" is the only placeholder and matches the flag body.

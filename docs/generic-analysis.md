@@ -124,6 +124,7 @@ Run only the M6 generic tests:
   `.xls` and `.ppt` files are treated as generic bytes.
 - Entropy windows use a fixed byte stride. A short hidden payload may not align
   with a window boundary; lower `window` and `step` to inspect it more closely.
-- `generic.archive` is an in-process Python extractor. It applies decompression
-  ratio and total-size guards but is not a security sandbox; M7 adds parser fuzz
-  coverage and further hardening.
+- `generic.archive` is an in-process Python extractor. It applies entry,
+  per-file, total-size and decompression-ratio guards (checked before and after
+  reading) but is not a security sandbox. See [Hardening](hardening.md) for
+  limits, process isolation and the malformed-input fuzz corpus.

@@ -16,7 +16,9 @@ import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
+
+IsolationMode = Literal["thread", "process"]
 
 APP_NAME = "nvox"
 CONFIG_FILENAME = "nvox.toml"
@@ -64,6 +66,7 @@ class ScanLimits:
     timeout: float = DEFAULT_TIMEOUT
     max_artifact_bytes: int = MAX_ARTIFACT_BYTES
     jobs: int = 0  # 0 means "auto" (one worker per CPU).
+    isolation: IsolationMode = "thread"
 
     def effective_jobs(self) -> int:
         if self.jobs > 0:
@@ -143,6 +146,7 @@ class Config:
                 path,
             ),
             jobs=_non_negative_int(scan.get("jobs", 0), "scan.jobs", path),
+            isolation=_isolation(scan.get("isolation", "thread"), "scan.isolation", path),
         )
         return cls(
             path=path,
@@ -191,6 +195,12 @@ def _positive_float(value: Any, key: str, path: Path) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
         raise ConfigError(f"{path}: {key} must be a positive number")
     return float(value)
+
+
+def _isolation(value: Any, key: str, path: Path) -> IsolationMode:
+    if value not in ("thread", "process"):
+        raise ConfigError(f"{path}: {key} must be 'thread' or 'process'")
+    return cast(IsolationMode, value)
 
 
 def _plugin_options(value: Any, path: Path) -> dict[str, dict[str, Any]]:

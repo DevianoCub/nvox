@@ -23,15 +23,16 @@ nvox scan photo.png --flag-format 'ctf{}'
    present, they add coverage automatically.
 4. **Evidence is immutable.** Input files are opened read-only; all output goes
    to a separate directory and every artifact is addressed by SHA-256.
-5. **Bounded analysis.** Depth, plugin timeouts, artifact size and worker count
-   are configurable and enforced. CLI scans write findings and provenance as
-   JSON. Command plugins and external bridges run in bounded subprocesses;
-   cooperative Python timeouts are not a security sandbox (optional Python
-   isolation is planned for M7).
+5. **Bounded analysis.** Depth, plugin timeouts, artifact size, archive
+   expansion ratios and worker count are configurable and enforced. CLI scans
+   write findings and provenance as JSON. Command plugins and external bridges
+   run in bounded subprocesses; `scan.isolation = "process"` adds hard-timeout
+   process isolation for eligible Python plugins. Python isolation is not an OS
+   sandbox; see [Hardening](hardening.md).
 
 ## Current status
 
-Nvox is under active development.
+**0.1.0** is the first tagged release. All milestones through M7 are complete.
 
 | Milestone | Scope | Status |
 |---|---|---|
@@ -40,9 +41,9 @@ Nvox is under active development.
 | M2 | Flag engine: formats, decoders, XOR brute, provenance | done |
 | M3 | Deep image analysis and steganography | done |
 | M4 | CLI polish, HTML report, TUI | done |
-| M5 | External tool bridges, declarative plugin hardening | implemented; pending acceptance |
-| M6 | Audio and generic file analysis | implemented; pending acceptance |
-| M7 | Hardening, docs, 0.1 release | planned |
+| M5 | External tool bridges, declarative plugin hardening | done |
+| M6 | Audio and generic file analysis | done |
+| M7 | Hardening, docs, 0.1 release | done |
 
 Working commands today: `nvox scan`, `nvox doctor`,
 `nvox plugins list|info|dirs`, `nvox extract`, `nvox report` and `nvox tui`.
@@ -74,11 +75,15 @@ each page marks its status explicitly.
 - [Flag engine](flag-engine.md)
 - [Tooling setup](tooling.md)
 - [Forensics and evidence handling](forensics.md)
+- [Hardening and malformed input](hardening.md)
+- [Performance and accelerator decision](performance.md)
+- [Migrating to 0.1.0](migration.md)
+- [Release checklist](release.md)
 - [Development](development.md)
 - [Roadmap](roadmap.md)
 
-Russian documentation is planned for `docs/ru/`; the directory exists but is
-intentionally empty for now.
+The Russian translation is in [`ru/`](ru/index.md). English pages are the
+source of truth when the two differ.
 
 ## Legal
 

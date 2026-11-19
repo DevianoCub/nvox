@@ -149,6 +149,32 @@ def test_tar_and_compressed_streams_are_extracted() -> None:
     assert child.media_type == "application/x-tar"  # type: ignore[attr-defined]
 
 
+def test_decompression_ratio_guards_skip_bombs() -> None:
+    payload = make_zip_entries(
+        [("bomb.bin", b"A" * 100_000), ("safe.txt", b"ctf{safe}")]
+    )
+    artifacts = _run(
+        ArchiveExtractor(),
+        payload,
+        "application/zip",
+        options={"max_ratio": 5, "max_file_bytes": 1_000_000},
+    )
+    names = {item.name for item in artifacts}
+    assert "archive/bomb.bin" not in names
+    summary = _meta(artifacts, "archive/summary")
+    entry = summary["entries"][0]  # type: ignore[index]
+    assert entry["status"] == "skipped"
+    assert "max_ratio" in entry["reason"]
+
+    with pytest.raises(PluginSkip, match="max_ratio"):
+        _run(
+            ArchiveExtractor(),
+            make_gzip(b"A" * 100_000),
+            "application/gzip",
+            options={"max_ratio": 5, "max_file_bytes": 1_000_000},
+        )
+
+
 def test_archive_errors_become_skips() -> None:
     plugin = ArchiveExtractor()
     artifact = make_artifact(

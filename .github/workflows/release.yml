@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync --group dev --extra docs --python 3.12
+
+      - name: Verify version matches tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          uv run python - <<'PY'
+          import os
+          import pathlib
+          import tomllib
+
+          tag = os.environ["TAG"]
+          version = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"]
+          expected = f"v{version}"
+          if tag != expected:
+              raise SystemExit(f"tag {tag!r} does not match project version {expected!r}")
+          print(f"releasing {version}")
+          PY
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy src
+
+      - name: Test
+        run: uv run pytest
+
+      - name: Build documentation
+        run: uv run mkdocs build --strict
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Smoke test the wheel
+        run: |
+          python -m venv .release-venv
+          . .release-venv/bin/activate
+          python -m pip install --quiet dist/*.whl
+          nvox --version
+          nvox doctor --json > /tmp/nvox-doctor.json
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign release artifacts
+        run: |
+          for file in dist/*; do
+            cosign sign-blob --yes --bundle "${file}.sigstore.json" "$file"
+          done
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*
+            dist/*.sigstore.json
+          generate_release_notes: true

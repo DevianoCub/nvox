@@ -23,7 +23,7 @@
                                |  decoding chain |      +--------+--------+
                                +-----------------+               |
                                                                  v
-                                           JSON (HTML/TUI planned for M4)
+                                  JSON/CSV, HTML report, TUI
 ```
 
 The loop is the important part: an analyzer that yields a new artifact puts it
@@ -103,8 +103,9 @@ no core changes. See [Plugins](plugins.md).
   plugins run in worker threads and check a cooperative deadline on emission;
   a hung plugin is abandoned at its timeout and late emissions are ignored.
   Command plugins and external bridges additionally receive a hard subprocess
-  timeout, process-group termination and streamed output caps. Optional process
-  isolation for Python plugins is planned for M7.
+  timeout, process-group termination and streamed output caps. With
+  `scan.isolation = "process"`, eligible Python plugins also run in a spawned
+  child that is killed on timeout.
 - **Size** (`scan.max_artifact_bytes`): upper bound for materialised artifacts;
   oversized emissions become skips.
 - **Workers** (`scan.jobs`, default auto): up to this many plugin invocations

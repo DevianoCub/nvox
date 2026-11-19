@@ -62,7 +62,7 @@ def _sample_report(tmp_path: Path) -> tuple[Path, dict[str, object]]:
         "evidence": {"sha256": image.sha256, "path": str(tmp_path / "challenge.png")},
     }
     report: dict[str, object] = {
-        "nvox": "0.1.0.dev0",
+        "nvox": "0.1.0",
         "mode": "flags",
         "formats": ["ctf{}"],
         "patterns": [],

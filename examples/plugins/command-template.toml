@@ -1,0 +1,22 @@
+# Copy-paste template for a declarative command plugin.
+# Copy to plugins/ and edit the command, targets, options and limits.
+[plugin]
+name = "example.command_template"
+kind = "analyzer"
+targets = ["*/*"]
+requires = ["file"]
+command = ["file", "--brief", "{input}"]
+output = "text"
+description = "Template plugin: run a bounded external command."
+timeout = 30
+
+[plugin.options]
+brief = { type = "bool", default = true, help = "Prefer concise output." }
+
+[plugin.sandbox]
+timeout = 30
+max_output_bytes = 1048576
+max_file_bytes = 8388608
+max_files = 64
+max_total_bytes = 16777216
+inherit_env = false

@@ -220,6 +220,73 @@ def test_plugin_errors_are_isolated(tmp_path: Path) -> None:
     assert "RuntimeError: boom" in result.skips[0].reason
 
 
+def _write_isolated_plugin(tmp_path: Path, body: str) -> Path:
+    directory = tmp_path / "plugins"
+    directory.mkdir()
+    (directory / "isolated_plugin.py").write_text(
+        "from __future__ import annotations\n"
+        "\n"
+        "from nvox.api import Analyzer, Artifact, Context\n"
+        "\n"
+        "\n"
+        "class Isolated(Analyzer):\n"
+        '    name = "test.isolated"\n'
+        '    targets = ("application/octet-stream",)\n'
+        "    priority = 100\n"
+        "\n"
+        "    def run(self, artifact: Artifact, ctx: Context) -> None:\n"
+        f"{body}",
+        encoding="utf-8",
+    )
+    return directory
+
+
+def _isolated_engine(plugin_dir: Path, *, timeout: float = 10.0) -> Engine:
+    config = Config(
+        plugin_dirs=(plugin_dir,),
+        limits=ScanLimits(isolation="process", jobs=1, timeout=timeout),
+    )
+    registry = PluginRegistry().load_all(config).subset(["test.isolated"])
+    return Engine(config, registry=registry)
+
+
+def test_process_isolation_runs_discovered_plugin(tmp_path: Path) -> None:
+    plugin_dir = _write_isolated_plugin(
+        tmp_path,
+        '        ctx.text("isolated", "from child")\n',
+    )
+    result = _isolated_engine(plugin_dir).analyze(_write_sample(tmp_path))
+
+    assert result.skips == ()
+    texts = result.by_kind(ArtifactKind.TEXT)
+    assert [artifact.payload for artifact in texts] == [b"from child"]
+    assert texts[0].producer == "test.isolated"
+
+
+def test_process_isolation_kills_timed_out_plugin(tmp_path: Path) -> None:
+    plugin_dir = _write_isolated_plugin(
+        tmp_path,
+        "        import time\n"
+        "\n"
+        "        time.sleep(30)\n"
+        '        ctx.text("late", "too late")\n',
+    )
+    started = time.monotonic()
+    result = _isolated_engine(plugin_dir, timeout=0.5).analyze(_write_sample(tmp_path))
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 5
+    assert [skip.kind for skip in result.skips] == ["timeout"]
+    assert "0.5s" in result.skips[0].reason
+
+
+def test_process_isolation_falls_back_for_manual_plugins(tmp_path: Path) -> None:
+    config = Config(plugin_dirs=(), limits=ScanLimits(isolation="process", jobs=1))
+    result = _engine([ToText], config=config).analyze(_write_sample(tmp_path))
+    assert result.skips == ()
+    assert any(artifact.name == "decoded" for artifact in result.artifacts)
+
+
 class Optioned(Analyzer):
     name = "test.optioned"
     targets = ("application/octet-stream",)

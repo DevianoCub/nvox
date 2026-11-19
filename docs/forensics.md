@@ -56,7 +56,7 @@ equivalent.
 
 ```json
 {
-  "nvox": "0.1.0.dev0",
+  "nvox": "0.1.0",
   "started_at": "2026-11-14T12:00:00Z",
   "finished_at": "2026-11-14T12:00:06Z",
   "formats": ["ctf{}"],
@@ -90,19 +90,21 @@ and finding entries contain the full records described above.
 
 | Risk | M2 mitigation |
 |---|---|
-| Zip bombs / decompression bombs | artifact size cap, decoder output cap, depth limit; ratio guard in M7 |
+| Zip bombs / decompression bombs | archive entry, per-file, total and ratio caps; decoder output and artifact size caps; depth limit |
 | Infinite plugin chains | content-hash dedup, per-plugin visited set, `max_depth` |
 | Hanging plugins | cooperative per-plugin timeout; hard process-group kill for command plugins and bridges |
 | Huge output floods | artifact size cap; streamed stdout/stderr and output-file caps for command plugins and bridges |
 | Accidental modification | read-only evidence reads, separate output directory, no in-place writes |
-| Hostile parsers | small stdlib parsers with explicit bounds; process isolation for untrusted Python plugins is planned for M7 |
+| Hostile parsers | small stdlib parsers with explicit bounds; deterministic malformed-input corpus; optional process isolation for untrusted Python plugins |
 
 The cooperative timeout abandons a worker thread; it cannot forcibly stop Python
 code that ignores the deadline. Command plugins and external bridges run in a
 separate process group with streamed output caps and best-effort POSIX rlimits,
 but this is not a security boundary against a hostile local user. Do not treat
-the default worker-thread model as a sandbox for untrusted Python plugins;
-optional isolation for those is planned for M7.
+the default worker-thread model as a sandbox for untrusted Python plugins.
+`scan.isolation = "process"` hard-kills an eligible Python plugin on timeout,
+but it does not restrict filesystem or network access; use an OS sandbox for
+hostile code. See [Hardening](hardening.md).
 
 ## Reporting guidance
 

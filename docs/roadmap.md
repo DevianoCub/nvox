@@ -90,7 +90,7 @@ Acceptance: a real sample is triaged end-to-end from the terminal, and the HTML
 report opens offline. The report and terminal workflow are documented in
 [HTML reports and TUI](report.md).
 
-## M5 — Bridges and declarative plugins (implemented; pending acceptance)
+## M5 — Bridges and declarative plugins (done)
 
 - [x] `core/sandbox.py`: rlimits, process-group kill, streamed output caps for
       command plugins and bridges
@@ -111,7 +111,7 @@ skipped with a reason and the scan still completes. Bridge tests use fake
 executables on `PATH`, and a separate scan test removes every requirement to
 verify that the artifact pipeline still completes.
 
-## M6 — Audio and generic files
+## M6 — Audio and generic files (done)
 
 - [x] Audio metadata (ID3, ffprobe), WAV sample LSB, MP3 frame anomalies
 - [x] Spectrogram rendering, optional OCR of spectrogram text through the
@@ -123,15 +123,16 @@ verify that the artifact pipeline still completes.
 Acceptance: audio fixtures and recursive archive fixtures pass; audio pack
 reuses the same plugin contracts as images.
 
-## M7 — Hardening and 0.1
+## M7 — Hardening and 0.1 (done)
 
-- [ ] Zip-bomb and decompression-ratio guards, fuzz targets for parsers
-- [ ] Optional process isolation for untrusted Python plugins; the default
+- [x] Zip-bomb and decompression-ratio guards, fuzz targets for parsers
+- [x] Optional process isolation for untrusted Python plugins; the default
       remains a cooperative worker-thread timeout
-- [ ] Performance pass; decide on a Rust/PyO3 accelerator using benchmarks
-- [ ] Plugin template, conformance tests, migration notes
-- [ ] Full English docs review; Russian translation in `docs/ru/`
-- [ ] CI on Linux/macOS, signed release artifacts, version 0.1.0
+- [x] Performance pass; decide on a Rust/PyO3 accelerator using benchmarks
+- [x] Plugin template, conformance tests, migration notes
+- [x] Full English docs review; Russian translation in `docs/ru/`
+- [x] CI on Linux/macOS, signed release artifacts, version 0.1.0
 
 Acceptance: 0.1.0 release checklist complete; no known crash on malformed input
-in the fuzz corpus.
+in the fuzz corpus. See [Hardening](hardening.md), [Performance](performance.md),
+[Migration](migration.md) and [Release](release.md).

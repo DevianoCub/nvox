@@ -15,6 +15,25 @@ def test_defaults_without_config(tmp_path: Path) -> None:
     assert config.flag_formats == ()
     assert config.plugin_dirs == default_plugin_dirs(tmp_path)
     assert config.limits == ScanLimits()
+    assert config.limits.isolation == "thread"
+
+
+def test_loads_isolation_mode(tmp_path: Path) -> None:
+    (tmp_path / "nvox.toml").write_text(
+        '[scan]\nisolation = "process"\n',
+        encoding="utf-8",
+    )
+    config = Config.load(cwd=tmp_path)
+    assert config.limits.isolation == "process"
+
+
+def test_rejects_unknown_isolation_mode(tmp_path: Path) -> None:
+    (tmp_path / "nvox.toml").write_text(
+        '[scan]\nisolation = "green-threads"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="scan.isolation"):
+        Config.load(cwd=tmp_path)
 
 
 def test_loads_project_config(tmp_path: Path) -> None:

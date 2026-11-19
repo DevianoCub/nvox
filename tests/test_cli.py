@@ -36,6 +36,7 @@ def test_doctor_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert report["environment"]["nvox"] == __version__
     assert report["summary"]["total"] == len(report["tools"])
     assert report["config"]["path"] is None
+    assert report["config"]["limits"]["isolation"] == "thread"
     assert {tool["category"] for tool in report["tools"]} >= {"image", "audio", "generic"}
 
 
@@ -64,3 +65,13 @@ def test_invalid_config_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 1
     assert "config error" in result.output
+
+
+def test_scan_rejects_unknown_isolation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        ["scan", str(tmp_path / "missing.bin"), "--isolation", "vibes"],
+    )
+    assert result.exit_code == 1
+    assert "--isolation must be" in result.output

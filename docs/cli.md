@@ -53,6 +53,9 @@ nvox scan challenge.bin --flag-format 'ctf{}' --json --out out/
 
 # Skip expensive XOR brute force and external plugins
 nvox scan dump.bin --flag-format 'ctf{}' --no-xor-brute --no-external
+
+# Hard-kill an eligible Python plugin that ignores its cooperative deadline
+nvox scan untrusted.bin --isolation process
 ```
 
 | Option | Description |
@@ -65,6 +68,7 @@ nvox scan dump.bin --flag-format 'ctf{}' --no-xor-brute --no-external
 | `--depth N` | Override `scan.max_depth` |
 | `--timeout SECONDS` | Override the per-plugin timeout |
 | `--jobs`, `-j N` | Worker count; `0` means auto |
+| `--isolation MODE` | `thread` (default) or `process` for eligible Python plugins |
 | `--plugins NAME,...` | Restrict the run to selected plugin names |
 | `--no-external` | Disable command plugins and plugins with external `requires` |
 | `--no-xor-brute` | Disable single-byte XOR brute force |
@@ -113,7 +117,7 @@ provenance chains, and a summary:
 
 ```json
 {
-  "nvox": "0.1.0.dev0",
+  "nvox": "0.1.0",
   "mode": "flags",
   "formats": ["ctf{}"],
   "summary": {"files": 1, "artifacts": 42, "findings": 1, "skips": 7},
@@ -160,12 +164,13 @@ The JSON form is stable enough for CI:
 
 ```json
 {
-  "environment": {"nvox": "0.1.0.dev0", "python": "3.14.8", "...": "..."},
+  "environment": {"nvox": "0.1.0", "python": "3.14.8", "...": "..."},
   "config": {
     "path": null,
     "flag_formats": [],
     "plugin_dirs": [{"path": "...", "exists": false}],
-    "limits": {"max_depth": 4, "timeout": 120.0, "jobs": 0, "effective_jobs": 8}
+    "limits": {"max_depth": 4, "timeout": 120.0, "jobs": 0,
+               "effective_jobs": 8, "isolation": "thread"}
   },
   "tools": [
     {"name": "exiftool", "category": "metadata", "found": true,
@@ -271,6 +276,7 @@ max_depth = 4
 timeout = 120
 max_artifact_bytes = 67108864
 jobs = 0
+isolation = "thread"     # or "process" for eligible Python plugins
 
 [flags]
 formats = ["ctf{}"]      # defaults used when --flag-format is absent
