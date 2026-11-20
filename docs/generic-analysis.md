@@ -1,10 +1,11 @@
 # Generic file analysis
 
-> **Status:** M6 complete. The generic pack adds entropy mapping, recursive
-> archive extraction, PDF structure/text checks, OOXML (DOCX/XLSX/PPTX)
-> inspection and UTF-32 strings. ZIP/TAR and gzip/bzip2/xz recursion use bounded
-> standard-library extractors; archive contents return to the artifact graph
-> like any other file.
+> **Status:** M6 complete, plus post-0.1 binary token extraction. The generic
+> pack adds entropy mapping, recursive archive extraction, PDF structure/text
+> checks, OOXML (DOCX/XLSX/PPTX) inspection, UTF-32 strings and individual
+> binary-token hand-off to decoders. ZIP/TAR and gzip/bzip2/xz recursion use
+> bounded standard-library extractors; archive contents return to the artifact
+> graph like any other file.
 
 Generic analysis is the fallback pack for inputs that are not images or audio.
 Every extractor emits child artifacts with provenance, so a flag inside a ZIP
@@ -16,6 +17,7 @@ text file.
 | Area | Built-in coverage |
 |---|---|
 | Strings | ASCII, UTF-16LE/BE and UTF-32LE/BE printable runs with byte offsets, minimum length and deduplication |
+| Binary tokens | Individual base64/base64url/hex/URL-escaped/braced tokens from binary strings, including UTF-16, emitted separately so the decoder chain can process mixed `.bin` payloads |
 | Entropy | Shannon entropy for the whole payload and sliding windows, step control, high-entropy window count, text table and grayscale heatmap |
 | ZIP | Central-directory entries, deflate/store, per-entry metadata, CRC, unsafe path rejection, encryption detection, file/total/ratio budgets |
 | TAR | Uncompressed and compressed TAR members, regular-file extraction, per-file and total budgets |
@@ -32,6 +34,7 @@ limited by `scan.max_artifact_bytes` in addition to the plugin's own budgets.
 | Plugin | Purpose | Main options |
 |---|---|---|
 | `generic.strings` | ASCII/UTF-16/UTF-32 printable runs | `min_length=4`, `utf16=True`, `utf32=True` |
+| `generic.binary_tokens` | Individual encoded tokens for the decoder chain | `max_input_bytes=8000000`, `min_token_length=8`, `max_token_bytes=4096`, `max_tokens=64`, `utf16=True` |
 | `generic.entropy` | Entropy map and heatmap PNG | `window=256`, `step=0` (auto), `max_windows=4096`, `emit_image=True` |
 | `generic.archive` | Recursive ZIP/TAR/gzip/bzip2/xz extraction | `max_entries=256`, `max_file_bytes=33554432`, `max_total_bytes=100663296`, `max_ratio=1000` |
 | `generic.pdf` | PDF metadata, streams, text and actions | `max_stream_bytes=8388608` |
@@ -66,6 +69,23 @@ Scan a PDF and keep the extracted streams, metadata and trailing data:
 
 ```bash
 nvox scan challenge.pdf --flag-format 'htb{}' --out out/
+```
+
+Scan a mixed binary payload where one base64 token is surrounded by noise:
+
+```bash
+nvox scan challenge.bin --flag-format 'ctf{}' --out out/
+```
+
+`generic.binary_tokens` emits each plausible token as its own text artifact, so
+`decoder.base64`, `decoder.hex` and the other decoders can process it
+individually. Adjust the budget for large binaries:
+
+```toml
+[plugins.options."generic.binary_tokens"]
+max_input_bytes = 2000000
+max_tokens = 32
+utf16 = false
 ```
 
 Inspect entropy around an appended payload:
@@ -103,6 +123,8 @@ and OOXML packages are assembled in `tests/fixture_builders.py`.
 | DOCX metadata, macros and external links | `make_docx`, `test_docx_metadata_macros_and_external_links` |
 | Plain ZIP and malformed OOXML | `test_office_ignores_plain_zip_and_rejects_bad_packages` |
 | UTF-32LE/BE strings | `test_strings_plugin_extracts_utf32_variants`, `test_utf32le_runs_report_byte_offsets` |
+| Binary token extraction and decoder chain | `tests/test_binary_tokens.py` |
+| Real-case corpus runner | `tests/test_check_corpus.py` |
 
 Run only the M6 generic tests:
 
@@ -128,3 +150,7 @@ Run only the M6 generic tests:
   per-file, total-size and decompression-ratio guards (checked before and after
   reading) but is not a security sandbox. See [Hardening](hardening.md) for
   limits, process isolation and the malformed-input fuzz corpus.
+- `generic.binary_tokens` is a token splitter, not a format detector. It does
+  not decode payloads itself and does not decide whether a token is a flag; it
+  only gives the existing decoders a clean candidate. Custom or encrypted
+  encodings still need a dedicated plugin or an external tool.

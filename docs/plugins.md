@@ -29,7 +29,7 @@ scanner searches them with full provenance.
 
 | Pack | Plugins | Milestone |
 |---|---|---|
-| `generic` | `generic.strings` (ASCII + UTF-16LE/BE + UTF-32LE/BE runs), `generic.carve` (embedded containers), `generic.entropy` (sliding-window map), `generic.archive` (recursive ZIP/TAR/gzip/bzip2/xz), `generic.pdf`, `generic.office` | M1-M6 |
+| `generic` | `generic.strings` (ASCII + UTF-16LE/BE + UTF-32LE/BE runs), `generic.binary_tokens` (individual encoded tokens for decoders), `generic.carve` (embedded containers), `generic.entropy` (sliding-window map), `generic.archive` (recursive ZIP/TAR/gzip/bzip2/xz), `generic.pdf`, `generic.office` | M1-M6 + post-0.1 |
 | `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `deflate`, `xor` | M2-M3 |
 | `image` | `image.structure`, `image.png_chunks`, `image.jpeg`, `image.exif`, `image.gif`, `image.bmp`, `image.tiff`, `image.channels`, `image.lsb` | M2-M3 |
 | `audio` | `audio.wav`, `audio.wav_lsb`, `audio.id3`, `audio.mp3_frames`, `audio.spectrogram`, `audio.tones`, `audio.echo` | M6 |
