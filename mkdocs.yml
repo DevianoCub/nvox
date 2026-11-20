@@ -27,8 +27,31 @@ nav:
   - HTML reports and TUI: report.md
   - Tooling setup: tooling.md
   - Forensics: forensics.md
+  - Hardening: hardening.md
+  - Performance: performance.md
+  - Migration: migration.md
+  - Release: release.md
   - Development: development.md
   - Roadmap: roadmap.md
+  - Русский:
+      - Обзор: ru/index.md
+      - Начало работы: ru/getting-started.md
+      - Архитектура: ru/architecture.md
+      - CLI: ru/cli.md
+      - Плагины: ru/plugins.md
+      - Флаги: ru/flag-engine.md
+      - Изображения: ru/image-analysis.md
+      - Аудио: ru/audio-analysis.md
+      - Общие файлы: ru/generic-analysis.md
+      - Отчёты и TUI: ru/report.md
+      - Инструменты: ru/tooling.md
+      - Криминалистика: ru/forensics.md
+      - Ужесточение: ru/hardening.md
+      - Производительность: ru/performance.md
+      - Миграция: ru/migration.md
+      - Релиз: ru/release.md
+      - Разработка: ru/development.md
+      - План: ru/roadmap.md
 
 markdown_extensions:
   - admonition

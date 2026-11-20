@@ -266,10 +266,7 @@ def test_process_isolation_runs_discovered_plugin(tmp_path: Path) -> None:
 def test_process_isolation_kills_timed_out_plugin(tmp_path: Path) -> None:
     plugin_dir = _write_isolated_plugin(
         tmp_path,
-        "        import time\n"
-        "\n"
-        "        time.sleep(30)\n"
-        '        ctx.text("late", "too late")\n',
+        '        import time\n\n        time.sleep(30)\n        ctx.text("late", "too late")\n',
     )
     started = time.monotonic()
     result = _isolated_engine(plugin_dir, timeout=0.5).analyze(_write_sample(tmp_path))

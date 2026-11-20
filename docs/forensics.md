@@ -1,10 +1,9 @@
 # Forensics and evidence handling
 
-> **Status:** evidence ingestion, hashing and the content-addressed artifact
-> store are implemented in M1. Findings and run metadata are written to
-> `findings.json` in M2. A separate manifest with Python/tool versions and the
-> self-contained HTML report land in M4. `docs/ru/` is reserved for the Russian
-> translation and is empty for now.
+> **Status:** evidence ingestion, hashing, the content-addressed artifact store,
+> JSON findings, the HTML report and the Russian translation are implemented
+> through 0.1.0. Resource limits and optional process isolation are documented
+> in [Hardening](hardening.md).
 
 Nvox is a triage and CTF tool, not a certified forensic suite. It is designed so
 that its output can be explained and reproduced, which is what matters both for
@@ -88,7 +87,7 @@ and finding entries contain the full records described above.
 
 ## Safety limits
 
-| Risk | M2 mitigation |
+| Risk | Control |
 |---|---|
 | Zip bombs / decompression bombs | archive entry, per-file, total and ratio caps; decoder output and artifact size caps; depth limit |
 | Infinite plugin chains | content-hash dedup, per-plugin visited set, `max_depth` |

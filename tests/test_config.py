@@ -32,7 +32,7 @@ def test_rejects_unknown_isolation_mode(tmp_path: Path) -> None:
         '[scan]\nisolation = "green-threads"\n',
         encoding="utf-8",
     )
-    with pytest.raises(ConfigError, match="scan.isolation"):
+    with pytest.raises(ConfigError, match=r"scan\.isolation"):
         Config.load(cwd=tmp_path)
 
 

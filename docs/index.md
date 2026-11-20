@@ -58,9 +58,9 @@ outguess, StegSolve, binwalk, foremost, zbar and tesseract, plus a hardened
 command-plugin sandbox. M6 adds the audio pack (WAV/MP3 metadata, sample LSB,
 spectrograms, DTMF/Morse, echo hints) and generic analysis (entropy maps,
 recursive archives, PDF and Office), with optional ffprobe and SoX bridges.
-Missing tools are recorded as skips and never abort a scan. Everything
-documented as "planned" describes the target design and is not implemented yet;
-each page marks its status explicitly.
+M7 adds archive ratio guards, deterministic malformed-input fuzzing, optional
+process isolation for Python plugins, plugin templates and the signed 0.1.0
+release pipeline. Missing tools are recorded as skips and never abort a scan.
 
 ## Documentation
 

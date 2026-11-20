@@ -19,12 +19,12 @@ checksums, keyless Sigstore signatures and a GitHub release.
 - [x] English docs are reviewed; Russian translation is in `docs/ru/`
 - [x] CI covers Linux and macOS; docs build is strict
 - [x] Release workflow builds, smoke-tests, checksums and signs artifacts
-- [ ] Final local gate: `pytest`, `ruff`, `ruff format --check`, `mypy`,
-      `mkdocs build --strict`, `git diff --check`
+- [x] Final local gate: `pytest`, `ruff`, `ruff format --check`, `mypy`,
+      `mkdocs build --strict`, fuzz corpus and `git diff --check`
 - [ ] Create and push the `v0.1.0` tag only after the local gate is green
 
-The final two items are completed by the release operator after the repository
-is committed and pushed; they are not performed by the coding session.
+The tag item is completed by the release operator after the repository is
+committed and pushed; it is not performed by the coding session.
 
 ## Local gate
 

@@ -142,14 +142,12 @@ users. Configuration-level service overrides are not implemented yet.
 
 Python gives the fastest path to broad stego coverage: Pillow/numpy for pixels,
 rich ecosystem for parsing formats, and plugins that users can write in a few
-lines. The architecture keeps hot loops (bit-plane extraction, entropy maps,
-sliding-window scanning) behind small functions in a future `api.accel` module,
-so a Rust module (PyO3) or a C extension can be swapped in later without
-touching plugin code.
-
-The rule for native code is benchmark-driven: a native implementation is added
-only when a profiled workload (for example a 12-megapixel PNG) misses its
-budget and the pure-Python path cannot be optimised further.
+lines. The 0.1.0 benchmark did not justify a Rust/PyO3 accelerator: the measured
+cost is distributed across plugin dispatch, artifact creation and speculative
+decoders rather than one isolated pixel loop. The decision and baseline are
+recorded in [Performance](performance.md); it is revisited only when a profile
+shows a specific pure-Python parser dominating realistic workloads after its
+budgets are applied.
 
 External binaries are the other fast path. They are treated as optional
 accelerators, not as the definition of a feature.

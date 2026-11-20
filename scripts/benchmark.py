@@ -54,7 +54,7 @@ def _zip() -> bytes:
         for index in range(8):
             archive.writestr(
                 f"member-{index}.txt",
-                ("ctf{benchmark_%d} " % index).encode() + b"x" * 2048,
+                f"ctf{{benchmark_{index}}} ".encode() + b"x" * 2048,
             )
     return buffer.getvalue()
 

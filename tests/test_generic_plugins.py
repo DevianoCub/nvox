@@ -150,9 +150,7 @@ def test_tar_and_compressed_streams_are_extracted() -> None:
 
 
 def test_decompression_ratio_guards_skip_bombs() -> None:
-    payload = make_zip_entries(
-        [("bomb.bin", b"A" * 100_000), ("safe.txt", b"ctf{safe}")]
-    )
+    payload = make_zip_entries([("bomb.bin", b"A" * 100_000), ("safe.txt", b"ctf{safe}")])
     artifacts = _run(
         ArchiveExtractor(),
         payload,

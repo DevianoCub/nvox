@@ -31,6 +31,7 @@ Nvox/
       store.py            # content-addressed artifact store
       registry.py         # plugin discovery and validation
       engine.py           # queue, limits, dedup, hooks dispatch
+      isolation.py        # optional spawned-process plugin runner
       hooks.py            # hook dispatch
       command_plugin.py   # declarative TOML command plugins + sandbox
       sandbox.py          # bounded subprocess execution
@@ -41,14 +42,18 @@ Nvox/
       tools.py            # external tool registry + detection
       doctor.py           # environment diagnostics
     plugins/              # built-in plugin packs
-      generic/            # strings and embedded-container carving
+      generic/            # strings, entropy, carving, archives, PDF, Office
       decoders/           # base encodings, compression, DEFLATE, XOR brute force
       image/              # PNG/JPEG/GIF/BMP/TIFF metadata, bit planes, channels
+      audio/              # WAV/MP3 metadata, sample LSB, spectra, tones
       bridges/            # optional external-tool bridges
-    tui/                  # Textual UI (M4)
+    tui/                  # Textual UI
+  examples/plugins/       # copy-paste plugin templates
+  scripts/                # tool installers, fuzzing and benchmarks
   tests/
+    fuzz_targets.py       # malformed-input corpus and mutation driver
   docs/
-    ru/                   # reserved for the Russian translation
+    ru/                   # Russian translation
 ```
 
 New core modules belong in `src/nvox/core/`; new techniques belong in
@@ -61,10 +66,16 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
+uv run mkdocs build --strict
+uv run python scripts/fuzz-parsers.py --iterations 50
+git diff --check
 ```
 
-The same commands gate every milestone. A milestone is complete only when all
-four pass and its acceptance criteria in the [roadmap](roadmap.md) are met.
+The same commands gate every milestone. A milestone is complete only when they
+pass and its acceptance criteria in the [roadmap](roadmap.md) are met. The short
+fuzz pass runs in `pytest`; the script is the longer release-candidate pass.
+`scripts/benchmark.py` records the performance baseline used for accelerator
+decisions.
 
 `uv run ruff format .` and `uv run ruff format --check .` are the canonical
 formatter commands; do not hand-format around them.
@@ -74,7 +85,8 @@ formatter commands; do not hand-format around them.
 - Python 3.12+ syntax; `from __future__ import annotations` in every module.
 - Full type annotations, including test functions.
 - Public functions and classes have docstrings; internal helpers may be concise.
-- User-facing text and documentation are English; `docs/ru/` is filled later.
+- User-facing text and code comments are English. Keep `docs/ru/` in sync with
+  user-visible changes; English pages are the source of truth.
 - No network calls in plugins or core by default.
 - Errors that a user can fix (bad config, missing file) are reported as clean
   messages with exit code 1, not tracebacks.
@@ -111,7 +123,12 @@ Core changes need a design note in the pull request covering:
 
 ## Releases
 
-1. Update the version in `pyproject.toml`.
-2. Update the roadmap status and `docs/` for anything user-visible.
-3. Run all checks on a clean `uv sync`.
-4. Tag `vX.Y.Z` and publish the wheel.
+1. Update the version in `pyproject.toml` and refresh `uv.lock`.
+2. Update `CHANGELOG.md`, the roadmap status, `docs/release.md` and user docs.
+3. Run the full local gate on a clean `uv sync`, including the fuzz and docs
+   checks.
+4. Tag `vX.Y.Z` and push the tag. `.github/workflows/release.yml` builds,
+   smoke-tests, checksums and signs the sdist/wheel with keyless Sigstore, then
+   publishes the GitHub release.
+
+The detailed checklist and verification commands are in [Release](release.md).
