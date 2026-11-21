@@ -24,7 +24,8 @@ metadata and structure, extracts configurable PNG bit planes, analyses
 palette/alpha/channel anomalies, carves embedded containers and decodes raw
 DEFLATE. The audio pack parses WAV/MP3 metadata, extracts sample bit planes,
 renders spectrograms and decodes DTMF/Morse hints. The generic pack adds entropy
-maps, recursive ZIP/TAR/compression extraction, PDF and OOXML inspection.
+maps, recursive ZIP/TAR/compression extraction, PDF and OOXML inspection, and
+binary-token extraction for mixed `.bin` payloads.
 Optional bridges add ExifTool, pngcheck, zsteg, steghide, stegseek, outguess,
 StegSolve, binwalk, foremost, zbar, tesseract, ffprobe and SoX; missing tools
 become recorded skips. Archive extraction is bounded by entry, size, total and
@@ -98,7 +99,7 @@ nvox scan photo.png --csv --out out/             # artifact CSV for spreadsheets
 nvox scan photo.png --no-html --out out/         # skip the HTML report
 nvox scan photo.png --flag-format 'ctf{}'
 nvox scan ./dump --flag 'flag\{[^}]+\}' -i --depth 4
-nvox scan challenge.bin --flag-format 'htb{}' --json --out out/
+nvox scan challenge.bin --flag-format 'htb{}' --json --out out/  # strings, tokens, carving
 nvox scan challenge.wav --flag-format 'ctf{}' --out out/   # WAV LSB, tones, spectrogram
 nvox scan song.mp3 --flag-format 'pico{}' --no-external     # ID3 and MPEG frames
 nvox scan bundle.zip --flag-format 'ctf{}' --out out/       # recursive archives
@@ -114,6 +115,7 @@ nvox plugins list                # loaded plugins and availability
 nvox plugins info generic.strings
 nvox plugins dirs                # discovery order and paths
 nvox extract <sha256> --store out/
+uv run python scripts/check-corpus.py --manifest ~/ctf-corpus/manifest.json --out /tmp/nvox-corpus
 nvox --version
 ```
 

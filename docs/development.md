@@ -49,7 +49,7 @@ Nvox/
       bridges/            # optional external-tool bridges
     tui/                  # Textual UI
   examples/plugins/       # copy-paste plugin templates
-  scripts/                # tool installers, fuzzing and benchmarks
+  scripts/                # tool installers, fuzzing, benchmarks and corpus runner
   tests/
     fuzz_targets.py       # malformed-input corpus and mutation driver
   docs/
@@ -79,6 +79,43 @@ decisions.
 
 `uv run ruff format .` and `uv run ruff format --check .` are the canonical
 formatter commands; do not hand-format around them.
+
+## Real-case corpus
+
+`scripts/check-corpus.py` runs a manifest of public CTF or forensic tasks and
+checks expected flags. Keep third-party evidence outside the repository; the
+`corpus/` directory is gitignored.
+
+```json
+[
+  {
+    "name": "picoctf-example",
+    "path": "picoctf-example/files",
+    "formats": ["picoCTF{}"],
+    "expected": ["picoCTF{example_flag}"],
+    "category": "png"
+  }
+]
+```
+
+```bash
+uv run python scripts/check-corpus.py \
+  --manifest ~/ctf-corpus/manifest.json \
+  --out /tmp/nvox-corpus-results
+```
+
+Relative `path` values are resolved against the manifest directory. The runner
+accepts either the expected body (`example_flag`) or the full flag
+(`picoCTF{example_flag}`). It reports missing flags, unexpected findings,
+artifact counts and runtime; `--json` emits the machine-readable summary,
+`--no-external` disables bridges, and `--fail-unexpected` treats extra findings
+as failures. Tasks may set `patterns`, `plugins`, `depth`, `timeout`, `jobs`,
+`isolation`, `ignore_case` or `external`; top-level `defaults` apply to every
+task.
+
+The runner executes `python -m nvox scan` for each task, so it exercises the CLI,
+plugin discovery, decoding and report writing. It never executes challenge
+binaries.
 
 ## Conventions
 

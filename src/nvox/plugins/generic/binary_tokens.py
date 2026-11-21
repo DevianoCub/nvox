@@ -117,7 +117,9 @@ class BinaryTokenPlugin(Analyzer):
     kind: ClassVar[PluginKind] = PluginKind.ANALYZER
     targets: ClassVar[tuple[str, ...]] = ("*/*",)
     priority: ClassVar[int] = 87
-    description: ClassVar[str] = "Extract individual base, hex and braced tokens from binary payloads."
+    description: ClassVar[str] = (
+        "Extract individual base, hex and braced tokens from binary payloads."
+    )
     options: ClassVar[dict[str, object]] = {
         "max_input_bytes": 8_000_000,
         "min_token_length": 8,

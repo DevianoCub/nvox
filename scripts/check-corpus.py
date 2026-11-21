@@ -113,9 +113,7 @@ def load_tasks(manifest: Path, corpus: Path) -> list[Task]:
             raise CorpusError(f"task {name!r}: expected flags require formats or patterns")
         for fmt in formats:
             if fmt.count("{}") != 1:
-                raise CorpusError(
-                    f"task {name!r}: format {fmt!r} must contain exactly one '{{}}'"
-                )
+                raise CorpusError(f"task {name!r}: format {fmt!r} must contain exactly one '{{}}'")
         isolation = merged.get("isolation")
         if isolation is not None and isolation not in {"thread", "process"}:
             raise CorpusError(f"task {name!r}: isolation must be 'thread' or 'process'")
@@ -180,13 +178,9 @@ def _match_expected(task: Task, findings: list[str]) -> tuple[list[str], list[st
                 forms.add(body)
         if not any((form.casefold() if ignore_case else form) in normalized for form in forms):
             missing.append(expected)
-    allowed = {
-        value.casefold() if ignore_case else value for value in _expected_candidates(task)
-    }
+    allowed = {value.casefold() if ignore_case else value for value in _expected_candidates(task)}
     unexpected = sorted(
-        value
-        for value in findings
-        if (value.casefold() if ignore_case else value) not in allowed
+        value for value in findings if (value.casefold() if ignore_case else value) not in allowed
     )
     return missing, unexpected
 
@@ -435,11 +429,7 @@ def main(argv: list[str] | None = None) -> int:
 
     manifest = args.manifest.expanduser()
     corpus = args.corpus.expanduser() if args.corpus else manifest.parent
-    out_root = (
-        args.out.expanduser()
-        if args.out
-        else Path(tempfile.mkdtemp(prefix="nvox-corpus-"))
-    )
+    out_root = args.out.expanduser() if args.out else Path(tempfile.mkdtemp(prefix="nvox-corpus-"))
     try:
         tasks = load_tasks(manifest, corpus)
     except CorpusError as exc:

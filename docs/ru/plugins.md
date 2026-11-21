@@ -20,7 +20,7 @@
 
 | Пакет | Плагины |
 |---|---|
-| `generic` | `generic.strings`, `generic.carve`, `generic.entropy`, `generic.archive`, `generic.pdf`, `generic.office` |
+| `generic` | `generic.strings`, `generic.binary_tokens`, `generic.carve`, `generic.entropy`, `generic.archive`, `generic.pdf`, `generic.office` |
 | `decoders` | `decoder.base64`, `base64url`, `base32`, `base85`, `hex`, `url`, `rot13`, `rot47`, `reverse`, `gzip`, `zlib`, `bzip2`, `xz`, `deflate`, `xor` |
 | `image` | `image.structure`, `image.png_chunks`, `image.jpeg`, `image.exif`, `image.gif`, `image.bmp`, `image.tiff`, `image.channels`, `image.lsb` |
 | `audio` | `audio.wav`, `audio.wav_lsb`, `audio.id3`, `audio.mp3_frames`, `audio.spectrogram`, `audio.tones`, `audio.echo` |

@@ -20,6 +20,9 @@ out/
 report/
 *.log
 
+# Local real-case corpus (third-party evidence)
+corpus/
+
 # Site build
 site/
 

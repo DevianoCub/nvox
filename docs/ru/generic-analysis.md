@@ -60,6 +60,23 @@ nvox scan bundle.zip --flag-format 'ctf{}' --no-external --out out/
 nvox scan challenge.pdf --flag-format 'htb{}' --out out/
 ```
 
+Скан `.bin`, где base64-токен окружён мусором:
+
+```bash
+nvox scan challenge.bin --flag-format 'ctf{}' --out out/
+```
+
+`generic.binary_tokens` создаёт отдельный текстовый артефакт для каждого
+подходящего токена, поэтому `decoder.base64`, `decoder.hex` и другие декодеры
+обрабатывают его независимо. Бюджет для больших файлов:
+
+```toml
+[plugins.options."generic.binary_tokens"]
+max_input_bytes = 2000000
+max_tokens = 32
+utf16 = false
+```
+
 ```toml
 [plugins.options."generic.entropy"]
 window = 512
@@ -86,7 +103,9 @@ nvox scan suspicious.bin --out out/
 ```
 
 Покрыты энтропия, ZIP/TAR/gzip, небезопасные пути и лимиты, рекурсивная
-цепочка, PDF-метаданные/действия/хвост, DOCX-макросы/ссылки и UTF-32.
+цепочка, PDF-метаданные/действия/хвост, DOCX-макросы/ссылки, UTF-32, бинарные
+токены и прогон реального корпуса (`tests/test_binary_tokens.py`,
+`tests/test_check_corpus.py`).
 
 ## Ограничения
 

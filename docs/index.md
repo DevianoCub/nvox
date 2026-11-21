@@ -60,7 +60,9 @@ spectrograms, DTMF/Morse, echo hints) and generic analysis (entropy maps,
 recursive archives, PDF and Office), with optional ffprobe and SoX bridges.
 M7 adds archive ratio guards, deterministic malformed-input fuzzing, optional
 process isolation for Python plugins, plugin templates and the signed 0.1.0
-release pipeline. Missing tools are recorded as skips and never abort a scan.
+release pipeline. Post-0.1 work adds `generic.binary_tokens` for mixed `.bin`
+payloads and `scripts/check-corpus.py` for real-case CTF/forensic regression
+runs. Missing tools are recorded as skips and never abort a scan.
 
 ## Documentation
 

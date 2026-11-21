@@ -3,6 +3,16 @@
 All notable changes are recorded here. The project follows semantic versioning
 from 0.1.0.
 
+## Unreleased
+
+### Added
+
+- `generic.binary_tokens` splits mixed binary strings into individual encoded
+  tokens so the existing base/hex/compression decoders can process them with
+  provenance.
+- `scripts/check-corpus.py` runs a manifest of real CTF/forensic tasks and
+  checks expected flags, unexpected findings and runtime.
+
 ## 0.1.0 — 2026-11-19
 
 First tagged release.
